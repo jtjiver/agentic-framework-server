@@ -1,0 +1,50 @@
+# Framework packages (installed separately - not part of server repo)
+agentic-framework-core/
+agentic-framework-security/
+agentic-framework-dev/
+agentic-framework-infrastructure/
+agentic-claude-config/
+
+# NPM packages (managed separately)
+node_modules/
+package.json
+package-lock.json
+.pnp
+.pnp.js
+
+# User workspaces (not in repo)
+projects/*
+!projects/.gitkeep
+
+# Security & sensitive files
+.secrets/
+.env
+.env.local
+*.key
+*.pem
+.1password-config
+
+# Temporary/build files
+.trash/
+.archive/
+logs/
+*.log
+
+# Framework working files
+.asw-config.json
+.gmail/
+.husky/
+VERSION
+index.js
+
+# Backup directories
+backups/
+.claude.backup.*/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
