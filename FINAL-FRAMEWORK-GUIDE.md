@@ -135,6 +135,154 @@ cd ../../clients/big-client/    # Work on client project
 
 ---
 
+## 🔄 Integrating Existing Projects
+
+### Cloning & Integrating a GitHub Project
+
+Have an existing project you want to integrate with the Agentic Framework? Here's how:
+
+#### Example: Integrating an Existing Next.js App
+
+```bash
+# 1. Navigate to your projects directory
+cd /opt/asw/projects/personal/
+
+# 2. Clone your existing project
+git clone https://github.com/yourusername/my-existing-app.git
+cd my-existing-app
+
+# 3. Set up vault configuration for the project
+source /opt/asw/agentic-framework-security/lib/shared/vault-context-manager.sh
+create_vault_config "MyExistingApp-Secrets"
+
+# 4. Create vault helper for easier secret management
+/opt/asw/scripts/setup-project-vault.sh MyExistingApp .
+
+# 5. Migrate existing .env files to 1Password
+# If you have a .env file with secrets:
+cat .env  # Review your secrets
+# Then add each to 1Password:
+create_secret "DATABASE_URL" "url" "postgresql://..."
+create_secret "STRIPE_KEY" "key" "sk_live_..."
+
+# 6. Create a secure .env loader (optional)
+cat > load-env.sh << 'EOF'
+#!/bin/bash
+source /opt/asw/agentic-framework-security/lib/shared/vault-context-manager.sh
+export DATABASE_URL=$(get_secret "DATABASE_URL" "url")
+export STRIPE_KEY=$(get_secret "STRIPE_KEY" "key")
+echo "✅ Environment loaded from vault"
+EOF
+chmod +x load-env.sh
+
+# 7. Update .gitignore to exclude sensitive files
+echo -e "\n# Agentic Framework\n.vault-config\nload-env.sh\n.env*" >> .gitignore
+
+# 8. Run your project with secure secrets
+source load-env.sh
+npm run dev  # or your usual start command
+```
+
+### Example: Integrating a Python Flask API
+
+```bash
+cd /opt/asw/projects/personal/
+
+# Clone and enter project
+git clone https://github.com/yourusername/flask-api.git
+cd flask-api
+
+# Set up framework integration
+source /opt/asw/agentic-framework-security/lib/shared/vault-context-manager.sh
+create_vault_config "FlaskAPI-Secrets"
+
+# Create Python-friendly secret loader
+cat > config.py << 'EOF'
+import subprocess
+import json
+
+def get_secret(item_name, field_name="password"):
+    """Get secret from 1Password vault"""
+    cmd = f"source /opt/asw/agentic-framework-security/lib/shared/vault-context-manager.sh && get_secret '{item_name}' '{field_name}'"
+    result = subprocess.run(cmd, shell=True, capture_output=True, text=True, executable='/bin/bash')
+    return result.stdout.strip()
+
+# Load your secrets
+DATABASE_URL = get_secret("DATABASE_URL", "url")
+API_KEY = get_secret("API_KEY", "key")
+SECRET_KEY = get_secret("SESSION_SECRET", "value")
+EOF
+
+# Update your Flask app to use the secure config
+# In app.py or wherever you initialize Flask:
+# from config import DATABASE_URL, API_KEY, SECRET_KEY
+```
+
+### Quick Integration Checklist
+
+For any existing project you want to integrate:
+
+1. **Clone to `/opt/asw/projects/`** - Keep everything organized
+   ```bash
+   cd /opt/asw/projects/personal/  # or clients/ or experiments/
+   git clone <your-repo-url>
+   ```
+
+2. **Set up vault configuration** - Project-specific secrets
+   ```bash
+   source /opt/asw/agentic-framework-security/lib/shared/vault-context-manager.sh
+   create_vault_config "ProjectName-Secrets"
+   ```
+
+3. **Migrate secrets to 1Password** - Move from .env files
+   ```bash
+   # Use create_secret or the 1Password UI to add secrets
+   create_secret "SECRET_NAME" "field" "value"
+   ```
+
+4. **Create language-specific loaders** - Based on your stack
+   - Node.js: Shell script that exports env vars
+   - Python: Config module using subprocess
+   - Go: Use `os/exec` to call vault scripts
+   - Ruby: Use backticks or `Open3.popen3`
+
+5. **Update .gitignore** - Exclude sensitive files
+   ```bash
+   echo ".vault-config" >> .gitignore
+   ```
+
+### Working with Different Project Types
+
+#### Docker Compose Projects
+```bash
+# Create docker-compose override for local dev
+cat > docker-compose.override.yml << 'EOF'
+version: '3'
+services:
+  app:
+    env_file:
+      - .env.local  # Generated from vault
+EOF
+
+# Generate .env.local from vault before running
+source vault-helper.sh
+echo "DB_URL=$(project_get_secret 'DATABASE_URL' 'url')" > .env.local
+docker-compose up
+```
+
+#### Monorepo Projects
+```bash
+# Set up vault config at monorepo root
+cd /opt/asw/projects/personal/my-monorepo
+create_vault_config "Monorepo-Secrets"
+
+# Each package can access the same vault
+cd packages/api && get_secret "API_DB_URL"
+cd ../frontend && get_secret "FRONTEND_API_KEY"
+```
+
+---
+
 ## 🎯 Key Benefits
 
 ✅ **One location** - everything in `/opt/asw/`  
