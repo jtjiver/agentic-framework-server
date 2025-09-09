@@ -102,17 +102,28 @@ If you initially create the SSH key in a team/shared vault:
 
 ### **Development Tools:**
 - ✅ Node.js v20.x + npm
+- ✅ Claude Code CLI (`@anthropic-ai/claude-code`)
 - ✅ 1Password CLI
 - ✅ Git, curl, wget, vim, htop
 - ✅ Essential build tools
 
+**Claude Code CLI Details:**
+- **Package**: `@anthropic-ai/claude-code` 
+- **Requirements**: Node.js 18+, 4GB+ RAM, Ubuntu 20.04+/Debian 10+
+- **Installation**: `sudo npm install -g @anthropic-ai/claude-code`
+- **Verification**: `claude --version`
+- **Documentation**: https://docs.anthropic.com/en/docs/claude-code/setup
+
 ### **ASW Framework Structure:**
 ```
-/opt/asw/
-├── agentic-framework-core/
-├── agentic-framework-dev/  
-├── agentic-framework-infrastructure/
-└── agentic-framework-security/
+/opt/asw/ (git repo: agentic-framework-server)
+├── .claude/                           ← Claude Code configuration
+├── agentic-framework-core/            ← Git repo: agentic-framework-core
+├── agentic-framework-dev/             ← Git repo: agentic-framework-dev  
+├── agentic-framework-infrastructure/  ← Git repo: agentic-framework-infrastructure
+├── agentic-framework-security/        ← Git repo: agentic-framework-security
+├── scripts/                           ← Server automation scripts
+└── docs/                             ← Documentation
 ```
 
 ### **User Account:**
@@ -156,8 +167,11 @@ If you initially create the SSH key in a team/shared vault:
 4. **User Account Creation**: Creates cc-user with secure random password
 5. **SSH Configuration**: Adds your key, hardens SSH settings
 6. **Security Implementation**: Firewall, fail2ban, strong ciphers
-7. **Temporary Key Cleanup**: Removes setup keys, keeps only yours
-8. **Final Validation**: Tests connection and reports success
+7. **Framework Repository Setup**: Clones agentic-framework-server as main /opt/asw git repo
+8. **Additional Framework Repos**: Clones agentic-framework-{core,dev,infrastructure,security} as subdirectories
+9. **Claude Code Integration**: Adds .claude configuration from agentic-claude-config repo
+10. **Framework Package Installation**: Runs setup.sh to install all framework packages
+11. **Final Validation**: Tests connection and reports success
 
 ## 🔧 **Script Features**
 
@@ -177,6 +191,14 @@ If you initially create the SSH key in a team/shared vault:
 - ✅ Updates 1Password with new user password
 - ✅ Handles Private vault SSH key workflow
 - ✅ Validates SSH agent compatibility
+
+### **Framework Integration:**
+- ✅ Clones agentic-framework-server as main git repository at `/opt/asw/`
+- ✅ Clones all framework component repos: core, dev, infrastructure, security
+- ✅ Installs Claude Code configuration (.claude folder) from agentic-claude-config
+- ✅ Runs setup.sh to install all framework packages
+- ✅ Creates complete working environment ready for development
+- ✅ Maintains proper git repository structure for version control
 
 ## 🚨 **Troubleshooting**
 
@@ -214,6 +236,25 @@ ssh-add -l | grep yourserver
 2. Confirm 1Password SSH agent is enabled
 3. Use `-A` flag: `ssh -A cc-user@SERVER_IP`
 
+### **Claude Code Installation Issues**
+**Package not found error:**
+- Correct package: `@anthropic-ai/claude-code` (not `@anthropic/claude-code-cli`)
+- Install command: `sudo npm install -g @anthropic-ai/claude-code`
+
+**Permission errors during npm install:**
+- Use `sudo` for global npm installs on most Linux systems
+- Verify Node.js 18+ is installed: `node --version`
+
+**Verification:**
+```bash
+# Check installation
+claude --version
+# Should return: 1.0.109 (Claude Code) or higher
+
+# Run diagnostics
+claude doctor
+```
+
 ## 📖 **Advanced Usage**
 
 ### **Custom Vault:**
@@ -248,7 +289,7 @@ When complete, you should see:
   - SSH hardened (key-only, no root)
   - UFW firewall enabled
   - fail2ban active
-  - Node.js + 1Password CLI installed
+  - Node.js + Claude Code + 1Password CLI installed
   - ASW framework structure ready
   - 1Password SSH agent integration
 ```
@@ -294,10 +335,11 @@ ssh -A cc-user@NEW_SERVER 'whoami && node --version && op --version'
 5. **SSH Hardening**: Updates `/etc/ssh/sshd_config.d/99-hardening.conf`
 6. **Password Authentication Disabled**: `PasswordAuthentication no`
 7. **Firewall Setup**: `ufw enable && ufw allow 22,80,443`
-8. **Tool Installation**: Node.js, 1Password CLI, fail2ban
-9. **Framework Setup**: Creates `/opt/asw/agentic-framework-*/` structure
-10. **Cleanup**: Removes temporary SSH keys, keeps only 1Password key
-11. **Validation**: Tests final SSH access and tool installation
+8. **Tool Installation**: Node.js, Claude Code CLI, 1Password CLI, fail2ban
+9. **Framework Setup**: Clones agentic-framework-server as main `/opt/asw/` git repo
+10. **Component Repos**: Clones agentic-framework-{core,dev,infrastructure,security} subdirectories
+11. **Cleanup**: Removes temporary SSH keys, keeps only 1Password key
+12. **Validation**: Tests final SSH access and tool installation
 
 ## 🔄 **Next Steps**
 

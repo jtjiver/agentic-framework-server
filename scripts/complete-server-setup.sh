@@ -144,10 +144,23 @@ if ! id -u cc-user >/dev/null 2>&1; then
     CC_PASS=$(openssl rand -base64 20)
     echo "cc-user:${CC_PASS}" | chpasswd
     usermod -aG sudo cc-user
+    
+    # Enable passwordless sudo for cc-user
+    echo "🔐 Configuring passwordless sudo for cc-user..."
+    echo "cc-user ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/cc-user
+    chmod 440 /etc/sudoers.d/cc-user
+    
     echo "NEW_CC_PASSWORD=${CC_PASS}" > /tmp/cc-user-creds
-    echo "✅ cc-user created with password: ${CC_PASS}"
+    echo "✅ cc-user created with password and passwordless sudo: ${CC_PASS}"
 else
     echo "✅ cc-user already exists"
+    # Ensure passwordless sudo is configured even for existing user
+    if [ ! -f /etc/sudoers.d/cc-user ]; then
+        echo "🔐 Configuring passwordless sudo for existing cc-user..."
+        echo "cc-user ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/cc-user
+        chmod 440 /etc/sudoers.d/cc-user
+        echo "✅ Passwordless sudo configured for cc-user"
+    fi
 fi
 
 # Setup SSH directory
@@ -165,16 +178,23 @@ EOF
 chmod 644 /home/cc-user/.ssh/config
 chown -R cc-user:cc-user /home/cc-user/.ssh
 
-# Create /opt/asw and ASW framework structure
-echo "📁 Creating ASW framework structure..."
+# Create temporary /opt/asw directory (will be replaced with git repo later)
+echo "📁 Creating temporary ASW directory..."
 mkdir -p /opt/asw
-mkdir -p /opt/asw/agentic-framework-{infrastructure,security,core,dev}/{bin,lib,docs,scripts}
 chown -R cc-user:cc-user /opt/asw
 
 # Install Node.js
 echo "⚙️  Installing Node.js..."
 curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
 apt-get install -y nodejs
+
+# Install Claude Code CLI
+echo "🤖 Installing Claude Code CLI..."
+# Package: @anthropic-ai/claude-code (from https://docs.anthropic.com/en/docs/claude-code/setup)
+# Requires Node.js 18+, 4GB+ RAM, Ubuntu 20.04+/Debian 10+
+# Note: This runs as root during server setup, so no sudo needed here
+# For manual install on existing server: sudo npm install -g @anthropic-ai/claude-code
+npm install -g @anthropic-ai/claude-code
 
 # Install 1Password CLI
 echo "🔑 Installing 1Password CLI..."
@@ -283,11 +303,56 @@ op item edit "$SERVER_ITEM" \
     "Setup Status"="Complete - $(date)" \
     2>/dev/null || warn "Could not update 1Password item (check permissions)"
 
-# Step 12: Final verification
-log "✅ Step 12: Final verification..."
+# Step 12: Clone framework repositories
+log "📦 Step 12: Setting up framework repositories as proper git repos..."
+
+# Get GitHub token
+GITHUB_TOKEN=$(op item get "Github Personal Access Token - TennisTracker CI/CD" --vault "$VAULT_NAME" --fields token --reveal 2>/dev/null || echo "")
+
+if [[ -n "$GITHUB_TOKEN" ]]; then
+    # Remove the existing /opt/asw directory structure and clone agentic-framework-server as the main repo
+    ssh -A cc-user@"$SERVER_IP" "
+        # Backup any existing content
+        if [ -d /opt/asw ]; then
+            sudo mv /opt/asw /opt/asw-backup-$(date +%s)
+        fi
+        
+        # Clone agentic-framework-server as the main /opt/asw repository
+        sudo git clone https://$GITHUB_TOKEN@github.com/jtjiver/agentic-framework-server.git /opt/asw
+        sudo chown -R cc-user:cc-user /opt/asw
+        echo '✅ agentic-framework-server cloned as main /opt/asw repo'
+    "
+    
+    # Clone agentic-claude-config and copy .claude folder
+    ssh -A cc-user@"$SERVER_IP" "cd /opt/asw && \
+        git clone https://$GITHUB_TOKEN@github.com/jtjiver/agentic-claude-config.git temp-claude && \
+        cp -r temp-claude/.claude . && \
+        rm -rf temp-claude && \
+        git add .claude && \
+        git config user.email 'cc-user@$(hostname)' && \
+        git config user.name 'CC User' && \
+        git commit -m 'Add Claude Code configuration' || true && \
+        echo '✅ .claude configuration added to main repo'"
+    
+    # Clone other agentic-framework repositories as subdirectories
+    for repo in core dev infrastructure security; do
+        ssh -A cc-user@"$SERVER_IP" "cd /opt/asw && \
+            git clone https://$GITHUB_TOKEN@github.com/jtjiver/agentic-framework-$repo.git agentic-framework-$repo && \
+            echo '✅ agentic-framework-$repo cloned as submodule'"
+    done
+    
+    # Run the framework setup script if it exists
+    ssh -A cc-user@"$SERVER_IP" "cd /opt/asw && [ -f ./setup.sh ] && ./setup.sh || echo 'No setup.sh found, skipping framework setup'"
+else
+    warn "⚠️  No GitHub token found - framework repositories not cloned"
+    warn "    Repositories must be set up manually"
+fi
+
+# Step 13: Final verification
+log "✅ Step 13: Final verification..."
 ssh -o PasswordAuthentication=no -o ConnectTimeout=10 \
     cc-user@"$SERVER_IP" \
-    "echo 'Server: $(hostname)' && echo 'User: $(whoami)' && echo 'Node.js: $(node --version)' && echo '1Password: $(op --version)' && echo 'Framework: $(ls -la /opt/asw/ | wc -l) directories'" \
+    "echo 'Server: $(hostname)' && echo 'User: $(whoami)' && echo 'Node.js: $(node --version)' && echo 'Claude Code: $(claude --version 2>/dev/null || echo \"not found\")' && echo '1Password: $(op --version)' && echo 'Framework: $(ls -la /opt/asw/ | wc -l) directories'" \
     2>/dev/null || warn "Final verification had issues"
 
 # Cleanup
@@ -308,8 +373,9 @@ echo "✅ Features Configured:"
 echo "  - SSH hardened (key-only, no root)"
 echo "  - UFW firewall enabled"
 echo "  - fail2ban active"
-echo "  - Node.js + 1Password CLI installed"
-echo "  - ASW framework structure ready"
+echo "  - Node.js + Claude Code + 1Password CLI installed"
+echo "  - ASW framework repositories cloned"
+echo "  - Claude Code configuration (.claude) installed"
 echo "  - 1Password SSH agent integration"
 echo ""
 echo "🔗 Connect with 1Password SSH agent:"
