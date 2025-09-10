@@ -45,10 +45,57 @@ fi
 SERVER_ITEM="$1"
 VAULT_NAME="${2:-TennisTracker-Dev-Vault}"
 
+# Create logs directory and setup logging
+LOGS_DIR="/opt/asw/logs"
+mkdir -p "$LOGS_DIR"
+TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+LOG_FILE="$LOGS_DIR/server-setup-${TIMESTAMP}.log"
+MD_REPORT="$LOGS_DIR/server-setup-${TIMESTAMP}.md"
+
+# Enhanced log function that writes to both console and files
+log() { 
+    local msg="$1"
+    echo -e "${GREEN}[$(date +'%H:%M:%S')]${NC} $msg" | tee -a "$LOG_FILE"
+    echo "$(date +'%H:%M:%S') - $msg" >> "$MD_REPORT"
+}
+
+warn() { 
+    local msg="$1"
+    echo -e "${YELLOW}[WARN]${NC} $msg" | tee -a "$LOG_FILE"
+    echo "⚠️ **WARNING**: $msg" >> "$MD_REPORT"
+}
+
+info() { 
+    local msg="$1"
+    echo -e "${BLUE}[INFO]${NC} $msg" | tee -a "$LOG_FILE"
+    echo "ℹ️ **INFO**: $msg" >> "$MD_REPORT"
+}
+
+error() { 
+    local msg="$1"
+    echo -e "${RED}[ERROR]${NC} $msg" | tee -a "$LOG_FILE"
+    echo "❌ **ERROR**: $msg" >> "$MD_REPORT"
+}
+
+# Initialize markdown report
+cat > "$MD_REPORT" << EOF
+# VPS Server Setup Report
+
+**Server Item**: $SERVER_ITEM  
+**Vault**: $VAULT_NAME  
+**Started**: $(date '+%Y-%m-%d %H:%M:%S')  
+**Log File**: $LOG_FILE  
+
+## Setup Progress
+
+EOF
+
 log "🚀 Starting Complete VPS Server Setup"
 log "Server Item: $SERVER_ITEM"
 log "SSH Key Item: $SSH_KEY_ITEM"
 log "Vault: $VAULT_NAME"
+info "📝 Logs being written to: $LOG_FILE"
+info "📊 Report being written to: $MD_REPORT"
 
 # Step 1: Check 1Password CLI
 log "📋 Step 1: Checking 1Password CLI access..."
@@ -121,114 +168,114 @@ if ! command -v sshpass &> /dev/null; then
     fi
 fi
 
-# Step 5: Create complete setup script
-log "📝 Step 5: Creating server setup script..."
-cat > /tmp/complete-remote-setup.sh << 'SETUP_SCRIPT'
-#!/bin/bash
-set -e
-
-echo "🚀 Starting complete server setup..."
-
-# Update system
-echo "📦 Updating system packages..."
-apt update && apt upgrade -y
-
-# Install essentials
-echo "🔧 Installing essential packages..."
-apt install -y sudo curl git wget htop vim nano build-essential ufw fail2ban unattended-upgrades
-
-# Create cc-user
-echo "👤 Creating cc-user..."
-if ! id -u cc-user >/dev/null 2>&1; then
-    useradd -m -s /bin/bash cc-user
-    CC_PASS=$(openssl rand -base64 20)
-    echo "cc-user:${CC_PASS}" | chpasswd
-    usermod -aG sudo cc-user
-    
-    # Enable passwordless sudo for cc-user
-    echo "🔐 Configuring passwordless sudo for cc-user..."
-    echo "cc-user ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/cc-user
-    chmod 440 /etc/sudoers.d/cc-user
-    
-    echo "NEW_CC_PASSWORD=${CC_PASS}" > /tmp/cc-user-creds
-    echo "✅ cc-user created with password and passwordless sudo: ${CC_PASS}"
+# Step 4.5: Detect SSH port
+log "🔍 Step 4.5: Detecting SSH port..."
+SSH_PORT=22
+# Use netcat to test ports without authentication attempts
+if timeout 3 nc -z "$SERVER_IP" 22 2>/dev/null; then
+    SSH_PORT=22
+    log "Port 22 is open, using SSH port 22"
+elif timeout 3 nc -z "$SERVER_IP" 2222 2>/dev/null; then
+    SSH_PORT=2222
+    log "Port 2222 is open, using SSH port 2222"
 else
-    echo "✅ cc-user already exists"
-    # Ensure passwordless sudo is configured even for existing user
-    if [ ! -f /etc/sudoers.d/cc-user ]; then
-        echo "🔐 Configuring passwordless sudo for existing cc-user..."
-        echo "cc-user ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/cc-user
-        chmod 440 /etc/sudoers.d/cc-user
-        echo "✅ Passwordless sudo configured for cc-user"
-    fi
+    error "Cannot detect SSH port (tried 22 and 2222)"
+    exit 1
 fi
 
-# Setup SSH directory
-echo "🔐 Setting up SSH for cc-user..."
-mkdir -p /home/cc-user/.ssh
-chmod 700 /home/cc-user/.ssh
+# Step 5: Prepare for step-by-step execution
+log "📝 Step 5: Preparing step-by-step server setup..."
 
-# SSH config for 1Password agent
-cat > /home/cc-user/.ssh/config << 'EOF'
+# Step 6: Run setup on server with real-time output
+log "🔄 Step 6: Executing setup on server..."
+log "  📦 6.1: Updating system packages..."
+ssh -A -o StrictHostKeyChecking=no -p "$SSH_PORT" cc-user@"$SERVER_IP" "sudo apt update && sudo apt upgrade -y"
+
+log "  🔧 6.2: Installing essential packages..."
+ssh -A -o StrictHostKeyChecking=no -p "$SSH_PORT" cc-user@"$SERVER_IP" "sudo apt install -y sudo curl git wget htop vim nano build-essential ufw fail2ban unattended-upgrades"
+
+log "  👤 6.3: Setting up cc-user..."
+ssh -A -o StrictHostKeyChecking=no -p "$SSH_PORT" cc-user@"$SERVER_IP" "
+if ! id -u cc-user >/dev/null 2>&1; then
+    sudo useradd -m -s /bin/bash cc-user
+    CC_PASS=\$(openssl rand -base64 20)
+    echo \"cc-user:\${CC_PASS}\" | sudo chpasswd
+    sudo usermod -aG sudo cc-user
+    echo \"cc-user ALL=(ALL) NOPASSWD:ALL\" | sudo tee /etc/sudoers.d/cc-user
+    sudo chmod 440 /etc/sudoers.d/cc-user
+    echo \"NEW_CC_PASSWORD=\${CC_PASS}\" | sudo tee /tmp/cc-user-creds
+    echo \"✅ cc-user created with password: \${CC_PASS}\"
+else
+    echo \"✅ cc-user already exists\"
+    if [ ! -f /etc/sudoers.d/cc-user ]; then
+        echo \"cc-user ALL=(ALL) NOPASSWD:ALL\" | sudo tee /etc/sudoers.d/cc-user
+        sudo chmod 440 /etc/sudoers.d/cc-user
+        echo \"✅ Passwordless sudo configured for cc-user\"
+    fi
+fi"
+
+log "  🔐 6.4: Setting up SSH configuration..."
+ssh -A -o StrictHostKeyChecking=no -p "$SSH_PORT" cc-user@"$SERVER_IP" "
+mkdir -p ~/.ssh
+chmod 700 ~/.ssh
+cat > ~/.ssh/config << 'EOF'
 Host *
     IdentityAgent ~/.1password/agent.sock
     ForwardAgent yes
 EOF
+chmod 644 ~/.ssh/config"
 
-chmod 644 /home/cc-user/.ssh/config
-chown -R cc-user:cc-user /home/cc-user/.ssh
+log "  📁 6.5: Creating ASW directory..."
+ssh -A -o StrictHostKeyChecking=no -p "$SSH_PORT" cc-user@"$SERVER_IP" "sudo mkdir -p /opt/asw && sudo chown -R cc-user:cc-user /opt/asw"
 
-# Create temporary /opt/asw directory (will be replaced with git repo later)
-echo "📁 Creating temporary ASW directory..."
-mkdir -p /opt/asw
-chown -R cc-user:cc-user /opt/asw
+log "  ⚙️ 6.6: Installing Node.js..."
+ssh -A -o StrictHostKeyChecking=no -p "$SSH_PORT" cc-user@"$SERVER_IP" "
+if ! command -v node &> /dev/null; then
+    curl -fsSL https://deb.nodesource.com/setup_20.x | sudo bash -
+    sudo apt-get install -y nodejs
+    echo \"✅ Node.js installed: \$(node --version)\"
+else
+    echo \"✅ Node.js already installed: \$(node --version)\"
+fi"
 
-# Install Node.js
-echo "⚙️  Installing Node.js..."
-curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-apt-get install -y nodejs
+log "  🤖 6.7: Installing Claude Code CLI..."
+ssh -A -o StrictHostKeyChecking=no -p "$SSH_PORT" cc-user@"$SERVER_IP" "
+if ! command -v claude &> /dev/null; then
+    sudo npm install -g @anthropic-ai/claude-code
+    echo \"✅ Claude Code CLI installed\"
+else
+    echo \"✅ Claude Code CLI already installed: \$(claude --version 2>/dev/null || echo 'installed')\"
+fi"
 
-# Install Claude Code CLI
-echo "🤖 Installing Claude Code CLI..."
-# Package: @anthropic-ai/claude-code (from https://docs.anthropic.com/en/docs/claude-code/setup)
-# Requires Node.js 18+, 4GB+ RAM, Ubuntu 20.04+/Debian 10+
-# Note: This runs as root during server setup, so no sudo needed here
-# For manual install on existing server: sudo npm install -g @anthropic-ai/claude-code
-npm install -g @anthropic-ai/claude-code
+log "  🔑 6.8: Installing 1Password CLI..."
+ssh -A -o StrictHostKeyChecking=no -p "$SSH_PORT" cc-user@"$SERVER_IP" "
+if ! command -v op &> /dev/null; then
+    curl -sS https://downloads.1password.com/linux/keys/1password.asc | sudo gpg --dearmor --output /usr/share/keyrings/1password-archive-keyring.gpg
+    echo \"deb [arch=\$(dpkg --print-architecture) signed-by=/usr/share/keyrings/1password-archive-keyring.gpg] https://downloads.1password.com/linux/debian/\$(dpkg --print-architecture) stable main\" | sudo tee /etc/apt/sources.list.d/1password.list
+    sudo apt update && sudo apt install -y 1password-cli
+    sudo mkdir -p ~/.1password && sudo chown cc-user:cc-user ~/.1password
+    echo \"✅ 1Password CLI installed: \$(op --version)\"
+else
+    echo \"✅ 1Password CLI already installed: \$(op --version)\"
+fi"
 
-# Install 1Password CLI
-echo "🔑 Installing 1Password CLI..."
-curl -sS https://downloads.1password.com/linux/keys/1password.asc | \
-    gpg --dearmor --output /usr/share/keyrings/1password-archive-keyring.gpg
+log "  🛡️ 6.9: Configuring firewall..."
+ssh -A -o StrictHostKeyChecking=no -p "$SSH_PORT" cc-user@"$SERVER_IP" "
+sudo ufw default deny incoming
+sudo ufw default allow outgoing  
+sudo ufw allow 2222/tcp comment 'SSH on port 2222'
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+echo 'y' | sudo ufw enable
+echo \"✅ UFW firewall configured\""
 
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/1password-archive-keyring.gpg] \
-    https://downloads.1password.com/linux/debian/$(dpkg --print-architecture) stable main" | \
-    tee /etc/apt/sources.list.d/1password.list
+log "  🚨 6.10: Configuring fail2ban..."
+ssh -A -o StrictHostKeyChecking=no -p "$SSH_PORT" cc-user@"$SERVER_IP" "sudo systemctl enable fail2ban && sudo systemctl start fail2ban && echo \"✅ fail2ban configured\""
 
-apt update && apt install -y 1password-cli
-
-mkdir -p /home/cc-user/.1password
-chown cc-user:cc-user /home/cc-user/.1password
-
-# Configure firewall
-echo "🛡️  Configuring UFW firewall..."
-ufw default deny incoming
-ufw default allow outgoing
-ufw allow 2222/tcp comment 'SSH on port 2222'
-ufw allow 80/tcp
-ufw allow 443/tcp
-echo "y" | ufw enable
-
-# Configure fail2ban
-echo "🚨 Configuring fail2ban..."
-systemctl enable fail2ban
-systemctl start fail2ban
-
-# SSH Hardening - BEFORE adding the key
-echo "🔒 Hardening SSH configuration..."
-cp /etc/ssh/sshd_config /etc/ssh/sshd_config.backup.$(date +%Y%m%d)
-
-cat > /etc/ssh/sshd_config.d/99-hardening.conf << 'EOF'
+log "  🔒 6.11: Hardening SSH configuration..."
+ssh -A -o StrictHostKeyChecking=no -p "$SSH_PORT" cc-user@"$SERVER_IP" "
+sudo cp /etc/ssh/sshd_config /etc/ssh/sshd_config.backup.\$(date +%Y%m%d) 2>/dev/null || true
+sudo tee /etc/ssh/sshd_config.d/99-hardening.conf > /dev/null << 'EOF'
 # SSH Hardening - Complete Setup
 Port 2222
 PermitRootLogin no
@@ -249,7 +296,7 @@ TCPKeepAlive yes
 ClientAliveInterval 300
 ClientAliveCountMax 2
 AllowAgentForwarding yes
-AllowTcpForwarding yes  # Required for VSCode/Cursor Remote SSH
+AllowTcpForwarding yes
 GatewayPorts no
 SyslogFacility AUTH
 LogLevel VERBOSE
@@ -257,39 +304,33 @@ Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.
 MACs hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com
 KexAlgorithms curve25519-sha256,curve25519-sha256@libssh.org
 EOF
+sudo sshd -t && echo \"✅ SSH configuration hardened\"
+"
 
-# Test SSH config
-sshd -t || { echo "❌ SSH config test failed"; exit 1; }
-
-echo "✅ Server setup complete!"
-SETUP_SCRIPT
-
-# Step 6: Run setup on server
-log "🔄 Step 6: Executing setup on server..."
-sshpass -p "$ROOT_PASS" ssh -o StrictHostKeyChecking=no root@"$SERVER_IP" 'bash -s' < /tmp/complete-remote-setup.sh
+log "✅ Step 6: Server setup complete!"
 
 # Step 7: Add SSH public key
 log "🔐 Step 7: Adding 1Password SSH public key to server..."
-sshpass -p "$ROOT_PASS" ssh -o StrictHostKeyChecking=no root@"$SERVER_IP" \
-    "echo '$SSH_PUBLIC_KEY' >> /home/cc-user/.ssh/authorized_keys && \
-     chmod 600 /home/cc-user/.ssh/authorized_keys && \
-     chown cc-user:cc-user /home/cc-user/.ssh/authorized_keys"
+ssh -A -o StrictHostKeyChecking=no -p "$SSH_PORT" cc-user@"$SERVER_IP" \
+    "echo '$SSH_PUBLIC_KEY' >> ~/.ssh/authorized_keys && \
+     chmod 600 ~/.ssh/authorized_keys"
 
 # Step 8: Restart SSH service
 log "🔄 Step 8: Restarting SSH service with hardened config..."
-sshpass -p "$ROOT_PASS" ssh -o StrictHostKeyChecking=no root@"$SERVER_IP" \
-    "systemctl restart ssh"
+ssh -A -o StrictHostKeyChecking=no -p "$SSH_PORT" cc-user@"$SERVER_IP" \
+    "sudo systemctl restart ssh"
 
 # Step 9: Get new cc-user password
 log "🔑 Step 9: Retrieving cc-user password..."
-CC_PASS=$(sshpass -p "$ROOT_PASS" ssh -o StrictHostKeyChecking=no root@"$SERVER_IP" \
-    "cat /tmp/cc-user-creds 2>/dev/null | grep NEW_CC_PASSWORD | cut -d= -f2" || echo "")
+CC_PASS=$(ssh -A -o StrictHostKeyChecking=no -p "$SSH_PORT" cc-user@"$SERVER_IP" \
+    "sudo cat /tmp/cc-user-creds 2>/dev/null | grep NEW_CC_PASSWORD | cut -d= -f2" || echo "")
 
 # Step 10: Test 1Password SSH access
 log "🧪 Step 10: Testing 1Password SSH access..."
 sleep 3  # Give SSH service a moment to restart
 
-if ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no \
+# After restart, SSH will be on port 2222 due to hardening config
+if ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -p 2222 \
     cc-user@"$SERVER_IP" "echo 'SSH access working!'" 2>/dev/null; then
     log "✅ 1Password SSH access working!"
 else
@@ -312,7 +353,7 @@ GITHUB_TOKEN=$(op item get "Github Personal Access Token - TennisTracker CI/CD" 
 
 if [[ -n "$GITHUB_TOKEN" ]]; then
     # Remove the existing /opt/asw directory structure and clone agentic-framework-server as the main repo
-    ssh -A cc-user@"$SERVER_IP" "
+    ssh -A -p 2222 cc-user@"$SERVER_IP" "
         # Backup any existing content
         if [ -d /opt/asw ]; then
             sudo mv /opt/asw /opt/asw-backup-$(date +%s)
@@ -325,7 +366,7 @@ if [[ -n "$GITHUB_TOKEN" ]]; then
     "
     
     # Clone agentic-claude-config and copy .claude folder
-    ssh -A cc-user@"$SERVER_IP" "cd /opt/asw && \
+    ssh -A -p 2222 cc-user@"$SERVER_IP" "cd /opt/asw && \
         git clone https://$GITHUB_TOKEN@github.com/jtjiver/agentic-claude-config.git temp-claude && \
         cp -r temp-claude/.claude . && \
         rm -rf temp-claude && \
@@ -337,27 +378,156 @@ if [[ -n "$GITHUB_TOKEN" ]]; then
     
     # Clone other agentic-framework repositories as subdirectories
     for repo in core dev infrastructure security; do
-        ssh -A cc-user@"$SERVER_IP" "cd /opt/asw && \
+        ssh -A -p 2222 cc-user@"$SERVER_IP" "cd /opt/asw && \
             git clone https://$GITHUB_TOKEN@github.com/jtjiver/agentic-framework-$repo.git agentic-framework-$repo && \
             echo '✅ agentic-framework-$repo cloned as submodule'"
     done
     
     # Run the framework setup script if it exists
-    ssh -A cc-user@"$SERVER_IP" "cd /opt/asw && [ -f ./setup.sh ] && ./setup.sh || echo 'No setup.sh found, skipping framework setup'"
+    ssh -A -p 2222 cc-user@"$SERVER_IP" "cd /opt/asw && [ -f ./setup.sh ] && ./setup.sh || echo 'No setup.sh found, skipping framework setup'"
 else
     warn "⚠️  No GitHub token found - framework repositories not cloned"
     warn "    Repositories must be set up manually"
 fi
 
 # Step 13: Final verification
-log "✅ Step 13: Final verification..."
-ssh -o PasswordAuthentication=no -o ConnectTimeout=10 \
+log "✅ Step 13: Basic system verification..."
+ssh -o PasswordAuthentication=no -o ConnectTimeout=10 -p 2222 \
     cc-user@"$SERVER_IP" \
     "echo 'Server: $(hostname)' && echo 'User: $(whoami)' && echo 'Node.js: $(node --version)' && echo 'Claude Code: $(claude --version 2>/dev/null || echo \"not found\")' && echo '1Password: $(op --version)' && echo 'Framework: $(ls -la /opt/asw/ | wc -l) directories'" \
-    2>/dev/null || warn "Final verification had issues"
+    2>/dev/null || warn "Basic verification had issues"
 
-# Cleanup
-rm -f /tmp/complete-remote-setup.sh
+# Step 14: Comprehensive ASW Framework validation
+log "🔍 Step 14: Running comprehensive ASW Framework validation..."
+echo "" >> "$MD_REPORT"
+echo "## ASW Framework Validation Results" >> "$MD_REPORT"
+echo "" >> "$MD_REPORT"
+echo '```' >> "$MD_REPORT"
+
+# Capture validation output to both console and report
+VALIDATION_OUTPUT=$(ssh -A -o StrictHostKeyChecking=no -p 2222 cc-user@"$SERVER_IP" \
+    "cd /opt/asw && /opt/asw/scripts/check-all-phases.sh" 2>&1)
+
+echo "$VALIDATION_OUTPUT" | tee -a "$LOG_FILE"
+echo "$VALIDATION_OUTPUT" >> "$MD_REPORT"
+echo '```' >> "$MD_REPORT"
+
+# Extract validation result for final summary
+if echo "$VALIDATION_OUTPUT" | grep -q "COMPLETE ASW FRAMEWORK VALIDATION: SUCCESS"; then
+    VALIDATION_STATUS="✅ SUCCESS"
+elif echo "$VALIDATION_OUTPUT" | grep -q "PARTIAL ASW FRAMEWORK VALIDATION"; then
+    VALIDATION_STATUS="⚠️ PARTIAL"
+else
+    VALIDATION_STATUS="❌ FAILED"
+fi
+
+echo "" >> "$MD_REPORT"
+echo "**Validation Status**: $VALIDATION_STATUS" >> "$MD_REPORT"
+
+# Step 15: Pull back remote validation logs
+log "📥 Step 15: Retrieving remote validation logs..."
+REMOTE_LOG_DIR="/opt/asw/logs"
+LOCAL_REMOTE_LOGS_DIR="$LOGS_DIR/remote-$(basename "$SERVER_IP")"
+mkdir -p "$LOCAL_REMOTE_LOGS_DIR"
+
+# Get the latest validation log file from remote server if it exists
+ssh -A -o StrictHostKeyChecking=no -p 2222 cc-user@"$SERVER_IP" \
+    "find /opt/asw -name '*.log' -o -name '*validation*.md' 2>/dev/null | head -10" > /tmp/remote_logs_list.txt 2>/dev/null || true
+
+if [[ -s /tmp/remote_logs_list.txt ]]; then
+    while IFS= read -r remote_log; do
+        if [[ -n "$remote_log" ]]; then
+            log_filename=$(basename "$remote_log")
+            log "  📄 Copying remote log: $log_filename"
+            scp -P 2222 -o StrictHostKeyChecking=no cc-user@"$SERVER_IP":"$remote_log" "$LOCAL_REMOTE_LOGS_DIR/" 2>/dev/null || warn "Failed to copy $log_filename"
+        fi
+    done < /tmp/remote_logs_list.txt
+    rm -f /tmp/remote_logs_list.txt
+else
+    info "No remote validation logs found to retrieve"
+fi
+
+# Also create a comprehensive validation summary file locally
+VALIDATION_SUMMARY="$LOGS_DIR/validation-summary-$(basename "$SERVER_IP")-$TIMESTAMP.md"
+cat > "$VALIDATION_SUMMARY" << EOF
+# Server Validation Summary
+
+**Server**: $SERVER_IP  
+**Validation Date**: $(date '+%Y-%m-%d %H:%M:%S')  
+**Setup Session**: $TIMESTAMP  
+**Status**: $VALIDATION_STATUS  
+
+## Remote Logs Retrieved
+$(ls -la "$LOCAL_REMOTE_LOGS_DIR" 2>/dev/null | tail -n +2 | awk '{print "- " $9 " (" $5 " bytes, " $6 " " $7 " " $8 ")"}' || echo "No remote logs available")
+
+## Validation Output
+\`\`\`
+$VALIDATION_OUTPUT
+\`\`\`
+
+## Next Steps
+$(if [[ "$VALIDATION_STATUS" == "✅ SUCCESS" ]]; then
+    echo "✅ Server is fully operational and ready for development"
+elif [[ "$VALIDATION_STATUS" == "⚠️ PARTIAL" ]]; then
+    echo "⚠️ Review validation results and address any failed components"
+else
+    echo "❌ Server requires attention - check validation output for specific issues"
+fi)
+EOF
+
+log "📋 Validation summary created: $VALIDATION_SUMMARY"
+info "🗂️ Remote logs stored in: $LOCAL_REMOTE_LOGS_DIR"
+
+# Cleanup - no temp files to remove
+
+# Finalize markdown report
+cat >> "$MD_REPORT" << EOF
+
+## Final Summary
+
+**Completed**: $(date '+%Y-%m-%d %H:%M:%S')  
+**Duration**: $(($(date +%s) - $(date -r "$LOG_FILE" +%s 2>/dev/null || date +%s))) seconds  
+**Server IP**: $SERVER_IP  
+**Username**: cc-user  
+**SSH Access**: \`ssh -A -p 2222 cc-user@$SERVER_IP\`  
+**Framework Directory**: /opt/asw/  
+**Validation Status**: $VALIDATION_STATUS  
+
+### Features Configured
+- ✅ SSH hardened (key-only, no root)
+- ✅ UFW firewall enabled  
+- ✅ fail2ban active
+- ✅ Node.js + Claude Code + 1Password CLI installed
+- ✅ ASW framework repositories cloned
+- ✅ Claude Code configuration (.claude) installed
+- ✅ 1Password SSH agent integration
+
+### Requirements
+- ✅ SSH key in 1Password Private vault
+- ✅ 1Password SSH agent enabled  
+- ✅ Use -A flag for agent forwarding
+
+### Log Files
+- **Setup Log**: $LOG_FILE
+- **Setup Report**: $MD_REPORT  
+- **Validation Summary**: $VALIDATION_SUMMARY
+- **Remote Logs**: $LOCAL_REMOTE_LOGS_DIR
+
+### Next Steps
+$(if [[ "$VALIDATION_STATUS" == "✅ SUCCESS" ]]; then
+    echo "🎉 Server is fully configured and ready for development!"
+    echo "- Create your first project: \`/opt/asw/scripts/new-project.sh my-project personal\`"
+    echo "- Start development server: \`asw-dev-server start\`"
+elif [[ "$VALIDATION_STATUS" == "⚠️ PARTIAL" ]]; then
+    echo "⚠️ Server setup is partially complete. Review validation results above."
+    echo "- Address any failed components"  
+    echo "- Re-run validation: \`ssh -A -p 2222 cc-user@$SERVER_IP 'cd /opt/asw && ./scripts/check-all-phases.sh'\`"
+else
+    echo "❌ Server setup has issues. Review validation results above."
+    echo "- Check the validation output for specific failures"
+    echo "- Consider re-running specific setup phases"
+fi)
+EOF
 
 log "🎉 SETUP COMPLETE!"
 echo ""
@@ -367,8 +537,12 @@ echo "=========================================="
 echo "📍 Server IP: $SERVER_IP"
 echo "👤 Username: cc-user" 
 echo "🔑 Password: $CC_PASS (saved in 1Password)"
-echo "🔐 SSH Access: ssh -A cc-user@$SERVER_IP"
+echo "🔐 SSH Access: ssh -A -p 2222 cc-user@$SERVER_IP"
 echo "📁 Framework: /opt/asw/"
+echo "📊 Setup Report: $MD_REPORT"
+echo "📝 Setup Log: $LOG_FILE"
+echo "📋 Validation Summary: $VALIDATION_SUMMARY"
+echo "🗂️ Remote Logs: $LOCAL_REMOTE_LOGS_DIR"
 echo ""
 echo "✅ Features Configured:"
 echo "  - SSH hardened (key-only, no root)"
@@ -379,8 +553,10 @@ echo "  - ASW framework repositories cloned"
 echo "  - Claude Code configuration (.claude) installed"
 echo "  - 1Password SSH agent integration"
 echo ""
+echo "🔍 Validation Status: $VALIDATION_STATUS"
+echo ""
 echo "🔗 Connect with 1Password SSH agent:"
-echo "   ssh -A cc-user@$SERVER_IP"
+echo "   ssh -A -p 2222 cc-user@$SERVER_IP"
 echo ""
 echo "📋 Requirements:"
 echo "  ✅ SSH key in 1Password Private vault"

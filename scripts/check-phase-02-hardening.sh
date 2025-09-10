@@ -129,7 +129,7 @@ if command -v ufw &>/dev/null || [[ -x "/usr/sbin/ufw" ]] || [[ -x "/sbin/ufw" ]
     # Determine UFW path
     UFW_CMD=""
     if command -v ufw &>/dev/null; then
-        UFW_CMD="ufw"
+        UFW_CMD="sudo ufw"
     elif [[ -x "/usr/sbin/ufw" ]]; then
         UFW_CMD="sudo /usr/sbin/ufw"
     elif [[ -x "/sbin/ufw" ]]; then
@@ -244,7 +244,7 @@ if command -v fail2ban-server &>/dev/null; then
     
     # Check active jails
     if command -v fail2ban-client &>/dev/null && systemctl is-active fail2ban &>/dev/null; then
-        active_jails=$(fail2ban-client status 2>/dev/null | grep "Jail list:" | cut -d: -f2 | xargs 2>/dev/null || echo "")
+        active_jails=$(sudo fail2ban-client status 2>/dev/null | grep "Jail list:" | cut -d: -f2 | xargs 2>/dev/null || echo "")
         if [[ -n "$active_jails" ]]; then
             check_pass "Active jails: $active_jails"
         else
@@ -348,13 +348,13 @@ echo -e "    Disk usage: $(df / | awk 'NR==2 {print $5}')"
 
 # Last login attempts
 if [[ -f "/var/log/auth.log" ]]; then
-    failed_attempts=$(grep "Failed password" /var/log/auth.log | tail -10 | wc -l 2>/dev/null || echo "0")
+    failed_attempts=$(sudo grep "Failed password" /var/log/auth.log 2>/dev/null | tail -10 | wc -l 2>/dev/null || echo "0")
     echo -e "    Recent failed login attempts: $failed_attempts (last 10 entries)"
 fi
 
 # fail2ban status
 if command -v fail2ban-client &>/dev/null && systemctl is-active fail2ban &>/dev/null; then
-    banned_count=$(fail2ban-client status sshd 2>/dev/null | grep "Currently banned:" | awk '{print $3}' 2>/dev/null | head -1 | tr -d '\n' || echo "0")
+    banned_count=$(sudo fail2ban-client status sshd 2>/dev/null | grep "Currently banned:" | awk '{print $3}' 2>/dev/null | head -1 | tr -d '\n' || echo "0")
     if [[ "$banned_count" =~ ^[0-9]+$ ]]; then
         echo -e "    Currently banned IPs: $banned_count"
     else

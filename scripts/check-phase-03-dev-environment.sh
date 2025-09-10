@@ -224,7 +224,9 @@ done
 
 # Check /usr/local/bin for ASW commands
 echo -e "  ${BLUE}Commands in /usr/local/bin:${NC}"
-asw_commands_count=$(ls -la /usr/local/bin/ 2>/dev/null | grep -c "asw-" || echo "0")
+asw_commands_count=$(ls -la /usr/local/bin/ 2>/dev/null | grep -c "asw-" 2>/dev/null || echo "0")
+asw_commands_count=${asw_commands_count//[^0-9]/}  # Remove non-numeric characters
+asw_commands_count=${asw_commands_count:-0}  # Default to 0 if empty
 if [[ "$asw_commands_count" -gt 0 ]]; then
     echo -e "    Found $asw_commands_count ASW commands in /usr/local/bin/"
 else
