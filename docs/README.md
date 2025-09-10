@@ -19,6 +19,10 @@ Comprehensive verification script that validates all setup steps with detailed r
 - **[Framework Complete Guide](FRAMEWORK-COMPLETE-GUIDE.md)** - Comprehensive framework overview
 - **[Simple Framework Flows](SIMPLE-FRAMEWORK-FLOWS.md)** - Common usage patterns
 
+### **System Configuration**
+- **[SSH Port Configuration](SSH-PORT-CONFIGURATION.md)** - SSH port 2222 setup with VSCode/Cursor support
+- **[CC User Profile Setup](CC-USER-PROFILE-SETUP.md)** - Standardized shell environment with tmux and Claude Code integration
+
 ### **1Password Integration**
 - **[1Password SSH Private Vault Requirement](1password-ssh-private-vault-requirement.md)** - SSH key vault requirements
 - **[Hybrid Vault Usage](HYBRID-VAULT-USAGE.md)** - Managing multiple vaults

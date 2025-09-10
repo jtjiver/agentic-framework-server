@@ -128,6 +128,7 @@ echo "Hardening SSH..."
 cp /etc/ssh/sshd_config /etc/ssh/sshd_config.backup.$(date +%Y%m%d)
 
 cat > /etc/ssh/sshd_config.d/99-hardening.conf << 'EOF'
+Port 2222
 PermitRootLogin no
 Protocol 2
 PasswordAuthentication no
@@ -146,7 +147,7 @@ TCPKeepAlive yes
 ClientAliveInterval 300
 ClientAliveCountMax 2
 AllowAgentForwarding yes
-AllowTcpForwarding no
+AllowTcpForwarding yes  # Required for VSCode/Cursor Remote SSH
 GatewayPorts no
 SyslogFacility AUTH
 LogLevel VERBOSE
@@ -161,7 +162,7 @@ apt install -y ufw fail2ban unattended-upgrades
 
 ufw default deny incoming
 ufw default allow outgoing
-ufw allow 22/tcp
+ufw allow 2222/tcp comment 'SSH on port 2222'
 ufw allow 80/tcp
 ufw allow 443/tcp
 echo "y" | ufw enable
