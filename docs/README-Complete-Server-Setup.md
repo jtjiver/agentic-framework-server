@@ -109,7 +109,13 @@ If you initially create the SSH key in a team/shared vault:
 - ✅ Git, curl, wget, vim, htop
 - ✅ Essential build tools
 - ✅ tmux + bash-completion
-- ✅ Diagnostic tools (iotop, nethogs, sysstat/sar)
+- ✅ Comprehensive monitoring toolkit:
+  - System: htop, top, ps, free, df, du, vmstat
+  - I/O: iotop, iostat, pidstat  
+  - Network: nethogs, netstat, ss, tcpdump, nmap
+  - Process: lsof, strace, dstat
+  - Statistics: sysstat/sar (with active collection)
+  - File system: tree
 - ✅ jq, unzip utilities
 
 **Claude Code CLI Details:**

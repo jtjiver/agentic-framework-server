@@ -117,6 +117,12 @@ diagnostic_tools=(
     "iotop"
     "nethogs" 
     "sysstat"
+    "tree"
+    "lsof"
+    "strace"
+    "tcpdump"
+    "nmap"
+    "dstat"
 )
 
 for tool in "${diagnostic_tools[@]}"; do
@@ -124,6 +130,30 @@ for tool in "${diagnostic_tools[@]}"; do
         check_pass "$tool is installed"
     else
         check_warn "$tool is not installed"
+    fi
+done
+
+# Check for performance monitoring commands that are typically part of base system
+performance_commands=(
+    "top"
+    "ps"
+    "free"
+    "df"
+    "du"
+    "vmstat"
+    "iostat"
+    "pidstat"
+    "netstat"
+    "ss"
+)
+
+echo ""
+echo -e "  ${BLUE}Core Performance Commands:${NC}"
+for cmd in "${performance_commands[@]}"; do
+    if command -v "$cmd" &>/dev/null; then
+        check_pass "$cmd command is available"
+    else
+        check_warn "$cmd command is not available"
     fi
 done
 

@@ -73,7 +73,7 @@ ssh -A -p 2222 cc-user@SERVER_IP 'bash -s' < complete-dev-environment-setup.sh
    - uv (fast Python package manager)
    - 1Password CLI
    - build-essential
-   - Diagnostic tools (iotop, nethogs, sysstat)
+   - Comprehensive monitoring toolkit (iotop, nethogs, sysstat, tree, lsof, strace, tcpdump, nmap, dstat)
    - tmux, bash-completion, jq, unzip
 4. **Configures SSH** for key-only authentication
 5. **Creates ASW framework** structure at `/opt/asw/`
