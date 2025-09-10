@@ -95,6 +95,9 @@ packages=(
     "htop"
     "build-essential"
     "jq"
+    "tmux"
+    "bash-completion"
+    "unzip"
 )
 
 for package in "${packages[@]}"; do
@@ -106,7 +109,42 @@ for package in "${packages[@]}"; do
 done
 
 echo ""
-echo -e "${YELLOW}3. NODE.JS AND NPM${NC}"
+echo -e "${YELLOW}3. DIAGNOSTIC AND MONITORING TOOLS${NC}"
+echo "==================================="
+
+# Diagnostic tools for system monitoring and troubleshooting
+diagnostic_tools=(
+    "iotop"
+    "nethogs" 
+    "sysstat"
+)
+
+for tool in "${diagnostic_tools[@]}"; do
+    if dpkg -l | grep -q "^ii.*$tool "; then
+        check_pass "$tool is installed"
+    else
+        check_warn "$tool is not installed"
+    fi
+done
+
+# Check if sysstat service is active (for sar command)
+if systemctl is-active sysstat &>/dev/null; then
+    check_pass "System statistics collection (sysstat) is active"
+elif systemctl is-enabled sysstat &>/dev/null; then
+    check_warn "System statistics collection (sysstat) is enabled but not active"
+else
+    check_warn "System statistics collection is not active"
+fi
+
+# Check if sar command is available
+if command -v sar &>/dev/null; then
+    check_pass "sar command is available"
+else
+    check_warn "sar command is not available (install sysstat package)"
+fi
+
+echo ""
+echo -e "${YELLOW}4. NODE.JS AND NPM${NC}"
 echo "=================="
 
 # Check Node.js installation
@@ -133,18 +171,47 @@ else
 fi
 
 echo ""
-echo -e "${YELLOW}4. 1PASSWORD CLI${NC}"
-echo "=================="
+echo -e "${YELLOW}5. 1PASSWORD CLI AND CONFIGURATION${NC}"
+echo "=================================="
 
 if command -v op &>/dev/null; then
     op_version=$(op --version)
     check_pass "1Password CLI is installed ($op_version)"
+    
+    # Check if service account token is available
+    if [[ -n "$OP_SERVICE_ACCOUNT_TOKEN" ]]; then
+        check_pass "1Password service account token is configured"
+        
+        # Test token validity by trying to list vaults
+        if op vault list >/dev/null 2>&1; then
+            check_pass "1Password service account token is valid and can access vaults"
+            
+            # Show available vaults (for information)
+            vault_count=$(op vault list --format json 2>/dev/null | jq length 2>/dev/null || echo "0")
+            if [[ $vault_count -gt 0 ]]; then
+                check_pass "Service account has access to $vault_count vault(s)"
+            else
+                check_warn "Service account token valid but no vaults accessible"
+            fi
+        else
+            check_fail "1Password service account token is invalid or lacks vault access"
+        fi
+    else
+        # Check if token exists in alternative locations
+        if [[ -f "/opt/asw/.secrets/op-service-account-token" ]]; then
+            check_warn "1Password token found in file but not in environment variable"
+        elif [[ -f "/home/cc-user/.config/1password/token" ]]; then
+            check_warn "1Password token found in cc-user config but not in environment"
+        else
+            check_fail "1Password service account token not configured (check OP_SERVICE_ACCOUNT_TOKEN)"
+        fi
+    fi
 else
     check_fail "1Password CLI is NOT installed"
 fi
 
 echo ""
-echo -e "${YELLOW}5. SSH CONFIGURATION${NC}"
+echo -e "${YELLOW}6. SSH CONFIGURATION${NC}"
 echo "====================="
 
 # Check SSH service
@@ -187,7 +254,7 @@ else
 fi
 
 echo ""
-echo -e "${YELLOW}6. ASW FRAMEWORK STRUCTURE${NC}"
+echo -e "${YELLOW}7. ASW FRAMEWORK STRUCTURE${NC}"
 echo "=========================="
 
 # Check /opt/asw directory structure
@@ -240,7 +307,83 @@ else
 fi
 
 echo ""
-echo -e "${YELLOW}7. SYSTEM INFORMATION${NC}"
+echo -e "${YELLOW}8. CC-USER SHELL ENVIRONMENT${NC}"
+echo "============================="
+
+# Check .bashrc exists and is configured
+if [[ -f "/home/cc-user/.bashrc" ]]; then
+    check_pass "cc-user .bashrc file exists"
+    
+    # Check if it contains ASW framework configuration
+    if grep -q "ASW Framework" /home/cc-user/.bashrc 2>/dev/null; then
+        check_pass ".bashrc contains ASW framework configuration"
+    else
+        check_warn ".bashrc exists but may not have ASW framework setup"
+    fi
+    
+    # Check for claude function in .bashrc
+    if grep -q "^claude()" /home/cc-user/.bashrc 2>/dev/null; then
+        check_pass ".bashrc contains claude function for tmux integration"
+    else
+        check_warn ".bashrc missing claude function (may impact tmux integration)"
+    fi
+    
+    # Check for banner alias
+    if grep -q "alias banner=" /home/cc-user/.bashrc 2>/dev/null; then
+        check_pass ".bashrc contains banner alias"
+    else
+        check_warn ".bashrc missing banner alias"
+    fi
+else
+    check_fail "cc-user .bashrc file missing"
+fi
+
+# Check tmux configuration
+if [[ -f "/home/cc-user/.tmux.conf" ]]; then
+    check_pass "cc-user .tmux.conf exists"
+else
+    check_warn "cc-user .tmux.conf missing (basic tmux functionality may be limited)"
+fi
+
+# Check login banner functionality (if framework is installed)
+if [[ -f "/opt/asw/agentic-framework-core/lib/utils/login-banner.sh" ]]; then
+    check_pass "Login banner script exists in framework"
+    
+    # Test if banner can be sourced without errors
+    if sudo -u cc-user bash -c "source /opt/asw/agentic-framework-core/lib/utils/login-banner.sh && declare -f show_framework_banner >/dev/null" 2>/dev/null; then
+        check_pass "Login banner script can be sourced successfully"
+    else
+        check_warn "Login banner script exists but may have issues"
+    fi
+else
+    check_warn "Login banner script not found (installed in Phase 3 with framework)"
+fi
+
+# Check essential directories for cc-user
+essential_dirs=(
+    "/home/cc-user/.config"
+    "/home/cc-user/.config/claude-projects"
+    "/home/cc-user/.config/1password"
+    "/home/cc-user/.local/bin"
+)
+
+for dir in "${essential_dirs[@]}"; do
+    if [[ -d "$dir" ]]; then
+        check_pass "$(basename "$dir") directory exists in cc-user config"
+    else
+        check_warn "$(basename "$dir") directory missing from cc-user config"
+    fi
+done
+
+# Check for Claude Code availability (if installed)
+if [[ -f "/home/cc-user/.local/bin/claude" ]] || command -v claude >/dev/null 2>&1; then
+    check_pass "Claude Code is available for cc-user"
+else
+    check_warn "Claude Code not found (may be installed manually later)"
+fi
+
+echo ""
+echo -e "${YELLOW}9. SYSTEM INFORMATION${NC}"
 echo "====================="
 
 echo -e "  ${BLUE}OS Information:${NC}"

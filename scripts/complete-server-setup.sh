@@ -192,7 +192,10 @@ log "  📦 6.1: Updating system packages..."
 ssh -A -o StrictHostKeyChecking=no -p "$SSH_PORT" cc-user@"$SERVER_IP" "sudo apt update && sudo apt upgrade -y"
 
 log "  🔧 6.2: Installing essential packages..."
-ssh -A -o StrictHostKeyChecking=no -p "$SSH_PORT" cc-user@"$SERVER_IP" "sudo apt install -y sudo curl git wget htop vim nano build-essential ufw fail2ban unattended-upgrades"
+ssh -A -o StrictHostKeyChecking=no -p "$SSH_PORT" cc-user@"$SERVER_IP" "sudo apt install -y sudo curl git wget htop vim nano build-essential ufw fail2ban unattended-upgrades iotop nethogs sysstat tmux bash-completion jq unzip"
+
+log "  📊 6.2.1: Enabling system statistics collection..."
+ssh -A -o StrictHostKeyChecking=no -p "$SSH_PORT" cc-user@"$SERVER_IP" "sudo systemctl enable sysstat && sudo systemctl start sysstat"
 
 log "  👤 6.3: Setting up cc-user..."
 ssh -A -o StrictHostKeyChecking=no -p "$SSH_PORT" cc-user@"$SERVER_IP" "
