@@ -225,15 +225,6 @@ Host *
 EOF
 chmod 644 ~/.ssh/config"
 
-log "  🎨 6.4.5: Setting up cc-user shell environment with banner..."
-ssh -A -o StrictHostKeyChecking=no -p "$SSH_PORT" cc-user@"$SERVER_IP" "
-if [[ -f /opt/asw/scripts/setup-cc-user-environment.sh ]]; then
-    echo '✅ Setting up enhanced shell environment with banner and aliases...'
-    sudo /opt/asw/scripts/setup-cc-user-environment.sh
-    echo '✅ Shell environment setup complete'
-else
-    echo '⚠️ cc-user environment setup script not found, skipping enhanced shell setup'
-fi"
 
 log "  📁 6.5: Creating ASW directory..."
 ssh -A -o StrictHostKeyChecking=no -p "$SSH_PORT" cc-user@"$SERVER_IP" "sudo mkdir -p /opt/asw && sudo chown -R cc-user:cc-user /opt/asw"
@@ -395,9 +386,60 @@ if [[ -n "$GITHUB_TOKEN" ]]; then
     
     # Run the framework setup script if it exists
     ssh -A -p 2222 cc-user@"$SERVER_IP" "cd /opt/asw && [ -f ./setup.sh ] && ./setup.sh || echo 'No setup.sh found, skipping framework setup'"
+    
+    # Set up cc-user shell environment with banner (after framework files are in place)
+    log "🎨 Step 12.1: Setting up cc-user shell environment with banner..."
+    ssh -A -p 2222 cc-user@"$SERVER_IP" "
+        if [[ -f /opt/asw/scripts/setup-cc-user-environment.sh ]]; then
+            echo '✅ Setting up enhanced shell environment with banner and aliases...'
+            sudo /opt/asw/scripts/setup-cc-user-environment.sh
+            echo '✅ Shell environment setup complete - login banner will be available'
+        else
+            echo '⚠️ cc-user environment setup script not found, skipping enhanced shell setup'
+        fi"
 else
     warn "⚠️  No GitHub token found - framework repositories not cloned"
     warn "    Repositories must be set up manually"
+    
+    # Even without framework repos, we can still set up basic cc-user environment
+    log "🎨 Step 12.1: Setting up basic cc-user shell environment..."
+    ssh -A -p 2222 cc-user@"$SERVER_IP" "
+        # Create basic tmux config and environment setup without framework dependencies
+        echo '⚠️ Setting up basic shell environment (no framework files available)'
+        
+        # Install basic packages
+        sudo apt update -qq
+        sudo apt install -y tmux bash-completion curl git unzip jq
+        
+        # Create directories
+        mkdir -p ~/.config/claude-projects ~/.config/1password ~/.local/bin
+        
+        # Basic .bashrc setup (without framework banner)
+        cat > ~/.bashrc << 'BASHRC_EOF'
+# Basic bash configuration
+case \$- in
+    *i*) ;;
+      *) return;;
+esac
+
+HISTCONTROL=ignoreboth
+shopt -s histappend
+HISTSIZE=2000
+HISTFILESIZE=4000
+
+# Colors and aliases
+alias ll='ls -alF'
+alias la='ls -A'
+alias l='ls -CF'
+
+# PATH
+export PATH=\"\$HOME/.local/bin:\$PATH\"
+
+echo '⚠️ ASW Framework not installed - basic shell only'
+BASHRC_EOF
+        
+        echo '✅ Basic shell environment setup complete (framework banner unavailable)'
+    "
 fi
 
 # Step 13: Final verification
