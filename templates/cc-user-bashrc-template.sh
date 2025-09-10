@@ -143,6 +143,13 @@ CONFIGEOF
 
     if [[ -z "$OP_TOKEN" ]]; then
         echo "❌ No 1Password token found (default or project-specific)"
+        echo ""
+        echo "🔧 Quick Setup Options:"
+        echo "1. Run interactive setup: /opt/asw/scripts/setup-1password-interactive.sh"
+        echo "2. Manual setup: echo 'ops_YOUR_TOKEN' > ~/.config/1password/token && chmod 600 ~/.config/1password/token"
+        echo "3. Check documentation: /opt/asw/docs/1PASSWORD-TOKEN-SETUP-GUIDE.md"
+        echo ""
+        echo "💡 Get your token from: https://my.1password.com → Settings → Service Accounts"
         return 1
     fi
 
@@ -187,7 +194,14 @@ CONFIGEOF
 
 # Export PATH and environment variables
 export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
-export OP_SERVICE_ACCOUNT_TOKEN=$(cat ~/.config/1password/token 2>/dev/null)
+
+# Load 1Password token if available (with fallback hierarchy)
+if [[ -f "/opt/asw/.secrets/op-service-account-token" ]]; then
+    export OP_SERVICE_ACCOUNT_TOKEN=$(sudo cat /opt/asw/.secrets/op-service-account-token 2>/dev/null)
+elif [[ -f "$HOME/.config/1password/token" ]]; then
+    export OP_SERVICE_ACCOUNT_TOKEN=$(cat $HOME/.config/1password/token 2>/dev/null)
+fi
+
 export USE_BUILTIN_RIPGREP=0
 
 # Load Cargo environment for uv and other Rust tools
@@ -235,7 +249,30 @@ if [[ -f "/opt/asw/agentic-framework-core/lib/utils/login-banner.sh" ]]; then
         return 1
     }
     
+    # Show framework banner with 1Password status
     show_framework_banner
+    
+    # Show 1Password setup status
+    echo ""
+    # Define colors for status display
+    GREEN='\033[0;32m'
+    YELLOW='\033[1;33m'
+    RED='\033[0;31m'
+    BLUE='\033[0;34m'
+    NC='\033[0m'
+    
+    if [[ -n "$OP_SERVICE_ACCOUNT_TOKEN" ]]; then
+        if op vault list >/dev/null 2>&1; then
+            vault_count=$(op vault list --format json 2>/dev/null | jq length 2>/dev/null || echo "unknown")
+            echo -e "   ${GREEN}✅ 1Password: Connected (${vault_count} vaults accessible)${NC}"
+        else
+            echo -e "   ${YELLOW}⚠️  1Password: Token present but authentication failed${NC}"
+        fi
+    else
+        echo -e "   ${RED}❌ 1Password: No token configured${NC}"
+        echo -e "   ${BLUE}💡 Run: /opt/asw/scripts/setup-1password-interactive.sh${NC}"
+    fi
+    echo ""
 fi
 
 # Note: Welcome display handled by enhanced login banner above
