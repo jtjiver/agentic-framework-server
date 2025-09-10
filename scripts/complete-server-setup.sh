@@ -572,6 +572,11 @@ cat >> "$MD_REPORT" << EOF
 - ✅ 1Password SSH agent enabled  
 - ✅ Use -A flag for agent forwarding
 
+### Next Steps
+1. **1Password Token Setup**: Configure service account token - see [1PASSWORD-TOKEN-SETUP-GUIDE.md](/opt/asw/docs/1PASSWORD-TOKEN-SETUP-GUIDE.md)
+2. **Framework Testing**: Run validation commands and test monitoring tools
+3. **Development Setup**: Create projects and test Claude integration
+
 ### Log Files
 - **Setup Log**: $LOG_FILE
 - **Setup Report**: $MD_REPORT  
@@ -620,6 +625,51 @@ echo "  - 1Password SSH agent integration"
 echo ""
 echo "🔍 Validation Status: $VALIDATION_STATUS"
 echo ""
+if [[ "$VALIDATION_STATUS" == "✅ SUCCESS" || "$VALIDATION_STATUS" == "⚠️ PARTIAL" ]]; then
+    echo "🚀 NEXT STEPS - Complete Server Configuration"
+    echo "============================================="
+    echo ""
+    echo "1️⃣ 1Password Service Account Token Setup:"
+    echo "   • Quick setup:"
+    echo "     ssh -A -p 2222 cc-user@$SERVER_IP"
+    echo "     echo 'ops_YOUR_TOKEN_HERE' > ~/.config/1password/token"
+    echo "     chmod 600 ~/.config/1password/token"
+    echo "     exit"
+    echo "   • 📖 Detailed guide: /opt/asw/docs/1PASSWORD-TOKEN-SETUP-GUIDE.md"
+    echo ""
+    echo "2️⃣ Test 1Password Integration:"
+    echo "   • SSH back in and test vault access:"
+    echo "     ssh -A -p 2222 cc-user@$SERVER_IP"
+    echo "     source ~/.bashrc"
+    echo "     op vault list"
+    echo "     op item list --vault 'Your-Vault-Name'"
+    echo ""
+    echo "3️⃣ Test Banner and Framework Tools:"
+    echo "   • Run the banner to see framework overview:"
+    echo "     b"
+    echo "   • Test Claude integration:"
+    echo "     claude myproject"
+    echo "   • Test monitoring tools:"
+    echo "     htop, iotop, nethogs, sar, dstat"
+    echo ""
+    echo "4️⃣ Test Python Environment:"
+    echo "   • Verify uv is working:"
+    echo "     uv --version"
+    echo "   • Create a test Python project:"
+    echo "     cd /tmp && uv init test-project && cd test-project"
+    echo "     uv add requests && uv run python -c 'import requests; print(\"✅ Python + uv working\")'"
+    echo ""
+    echo "5️⃣ Development Workflow:"
+    echo "   • Access your projects: cdp"
+    echo "   • Navigate to ASW: cda"
+    echo "   • Start Claude for project: claude [project-name]"
+    echo "   • Run validation: validate-all"
+    echo ""
+    echo "🧪 Complete System Test:"
+    echo "   • Run comprehensive validation: /opt/asw/scripts/test-server-setup.sh"
+    echo "   • This tests all components and provides detailed results"
+    echo ""
+fi
 echo "🔗 Connect with 1Password SSH agent:"
 echo "   ssh -A -p 2222 cc-user@$SERVER_IP"
 echo ""
