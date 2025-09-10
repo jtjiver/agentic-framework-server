@@ -69,8 +69,12 @@ ssh -A -p 2222 cc-user@SERVER_IP 'bash -s' < complete-dev-environment-setup.sh
 3. **Installs base packages**:
    - git, curl, wget, vim, htop
    - Node.js v20.x and npm
+   - Python 3, pip3, and venv
+   - uv (fast Python package manager)
    - 1Password CLI
    - build-essential
+   - Diagnostic tools (iotop, nethogs, sysstat)
+   - tmux, bash-completion, jq, unzip
 4. **Configures SSH** for key-only authentication
 5. **Creates ASW framework** structure at `/opt/asw/`
 

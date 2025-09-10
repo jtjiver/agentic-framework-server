@@ -102,10 +102,15 @@ If you initially create the SSH key in a team/shared vault:
 
 ### **Development Tools:**
 - ✅ Node.js v20.x + npm
+- ✅ Python 3 + pip3 + venv
+- ✅ uv (fast Python package manager)
 - ✅ Claude Code CLI (`@anthropic-ai/claude-code`)
 - ✅ 1Password CLI
 - ✅ Git, curl, wget, vim, htop
 - ✅ Essential build tools
+- ✅ tmux + bash-completion
+- ✅ Diagnostic tools (iotop, nethogs, sysstat/sar)
+- ✅ jq, unzip utilities
 
 **Claude Code CLI Details:**
 - **Package**: `@anthropic-ai/claude-code` 

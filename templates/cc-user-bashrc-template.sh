@@ -186,9 +186,12 @@ CONFIGEOF
 }
 
 # Export PATH and environment variables
-export PATH="$HOME/.local/bin:$PATH"
+export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
 export OP_SERVICE_ACCOUNT_TOKEN=$(cat ~/.config/1password/token 2>/dev/null)
 export USE_BUILTIN_RIPGREP=0
+
+# Load Cargo environment for uv and other Rust tools
+[[ -f "$HOME/.cargo/env" ]] && source "$HOME/.cargo/env"
 
 # ASW Framework aliases
 alias 1p="/opt/asw/agentic-framework-core/lib/security/1password-monitoring/1p-session.sh"

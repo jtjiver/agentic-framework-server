@@ -144,8 +144,8 @@ else
 fi
 
 echo ""
-echo -e "${YELLOW}4. NODE.JS AND NPM${NC}"
-echo "=================="
+echo -e "${YELLOW}4. NODE.JS, NPM AND PYTHON TOOLS${NC}"
+echo "================================="
 
 # Check Node.js installation
 if command -v node &>/dev/null; then
@@ -168,6 +168,30 @@ if command -v npm &>/dev/null; then
     check_pass "npm is installed ($npm_version)"
 else
     check_fail "npm is NOT installed"
+fi
+
+# Check Python
+if command -v python3 &>/dev/null; then
+    python_version=$(python3 --version 2>&1)
+    check_pass "Python 3 is installed ($python_version)"
+else
+    check_warn "Python 3 is not installed"
+fi
+
+# Check uv (Python package manager)
+if command -v uv &>/dev/null; then
+    uv_version=$(uv --version 2>/dev/null)
+    check_pass "uv (Python package manager) is installed ($uv_version)"
+else
+    check_warn "uv (Python package manager) is not installed"
+fi
+
+# Check pip
+if command -v pip3 &>/dev/null; then
+    pip_version=$(pip3 --version 2>/dev/null | cut -d' ' -f2)
+    check_pass "pip3 is installed (version $pip_version)"
+else
+    check_warn "pip3 is not installed"
 fi
 
 echo ""

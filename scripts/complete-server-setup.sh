@@ -192,7 +192,7 @@ log "  📦 6.1: Updating system packages..."
 ssh -A -o StrictHostKeyChecking=no -p "$SSH_PORT" cc-user@"$SERVER_IP" "sudo apt update && sudo apt upgrade -y"
 
 log "  🔧 6.2: Installing essential packages..."
-ssh -A -o StrictHostKeyChecking=no -p "$SSH_PORT" cc-user@"$SERVER_IP" "sudo apt install -y sudo curl git wget htop vim nano build-essential ufw fail2ban unattended-upgrades iotop nethogs sysstat tmux bash-completion jq unzip"
+ssh -A -o StrictHostKeyChecking=no -p "$SSH_PORT" cc-user@"$SERVER_IP" "sudo apt install -y sudo curl git wget htop vim nano build-essential ufw fail2ban unattended-upgrades iotop nethogs sysstat tmux bash-completion jq unzip python3 python3-pip python3-venv"
 
 log "  📊 6.2.1: Enabling system statistics collection..."
 ssh -A -o StrictHostKeyChecking=no -p "$SSH_PORT" cc-user@"$SERVER_IP" "sudo systemctl enable sysstat && sudo systemctl start sysstat"
@@ -242,7 +242,17 @@ else
     echo \"✅ Node.js already installed: \$(node --version)\"
 fi"
 
-log "  🤖 6.7: Installing Claude Code CLI..."
+log "  🐍 6.7: Installing uv (Python package manager)..."
+ssh -A -o StrictHostKeyChecking=no -p "$SSH_PORT" cc-user@"$SERVER_IP" "
+if ! command -v uv &> /dev/null; then
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    source ~/.cargo/env 2>/dev/null || true
+    echo \"✅ uv installed: \$(uv --version 2>/dev/null || echo 'installation pending - requires shell reload')\"
+else
+    echo \"✅ uv already installed: \$(uv --version)\"
+fi"
+
+log "  🤖 6.8: Installing Claude Code CLI..."
 ssh -A -o StrictHostKeyChecking=no -p "$SSH_PORT" cc-user@"$SERVER_IP" "
 if ! command -v claude &> /dev/null; then
     sudo npm install -g @anthropic-ai/claude-code
