@@ -182,6 +182,9 @@ fi
 if command -v uv &>/dev/null; then
     uv_version=$(uv --version 2>/dev/null)
     check_pass "uv (Python package manager) is installed ($uv_version)"
+elif [[ -f "$HOME/.local/bin/uv" ]]; then
+    uv_version=$("$HOME/.local/bin/uv" --version 2>/dev/null)
+    check_pass "uv (Python package manager) is installed ($uv_version)"
 else
     check_warn "uv (Python package manager) is not installed"
 fi
