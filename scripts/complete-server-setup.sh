@@ -225,6 +225,16 @@ Host *
 EOF
 chmod 644 ~/.ssh/config"
 
+log "  🎨 6.4.5: Setting up cc-user shell environment with banner..."
+ssh -A -o StrictHostKeyChecking=no -p "$SSH_PORT" cc-user@"$SERVER_IP" "
+if [[ -f /opt/asw/scripts/setup-cc-user-environment.sh ]]; then
+    echo '✅ Setting up enhanced shell environment with banner and aliases...'
+    sudo /opt/asw/scripts/setup-cc-user-environment.sh
+    echo '✅ Shell environment setup complete'
+else
+    echo '⚠️ cc-user environment setup script not found, skipping enhanced shell setup'
+fi"
+
 log "  📁 6.5: Creating ASW directory..."
 ssh -A -o StrictHostKeyChecking=no -p "$SSH_PORT" cc-user@"$SERVER_IP" "sudo mkdir -p /opt/asw && sudo chown -R cc-user:cc-user /opt/asw"
 
