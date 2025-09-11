@@ -57,41 +57,41 @@ echo "================"
 if [[ -f "/etc/ssh/sshd_config.d/99-hardening.conf" ]]; then
     check_pass "SSH hardening config file exists"
     
-    # Check specific hardening settings
+    # Check specific hardening settings (using sudo for secure file access)
     config_file="/etc/ssh/sshd_config.d/99-hardening.conf"
     
-    if grep -q "^PermitRootLogin no" "$config_file"; then
+    if sudo grep -q "^PermitRootLogin no" "$config_file" 2>/dev/null; then
         check_pass "Root login is disabled"
     else
         check_fail "Root login not properly disabled"
     fi
     
-    if grep -q "^PasswordAuthentication no" "$config_file"; then
+    if sudo grep -q "^PasswordAuthentication no" "$config_file" 2>/dev/null; then
         check_pass "Password authentication is disabled"
     else
         check_fail "Password authentication not properly disabled"
     fi
     
-    if grep -q "^PubkeyAuthentication yes" "$config_file"; then
+    if sudo grep -q "^PubkeyAuthentication yes" "$config_file" 2>/dev/null; then
         check_pass "Public key authentication is enabled"
     else
         check_fail "Public key authentication not enabled"
     fi
     
-    if grep -q "^AllowUsers cc-user" "$config_file"; then
+    if sudo grep -q "^AllowUsers cc-user" "$config_file" 2>/dev/null; then
         check_pass "SSH access restricted to cc-user"
     else
         check_warn "SSH user restriction not found (may be configured elsewhere)"
     fi
     
-    if grep -q "^MaxAuthTries" "$config_file"; then
-        max_tries=$(grep "^MaxAuthTries" "$config_file" | awk '{print $2}')
+    if sudo grep -q "^MaxAuthTries" "$config_file" 2>/dev/null; then
+        max_tries=$(sudo grep "^MaxAuthTries" "$config_file" 2>/dev/null | awk '{print $2}')
         check_pass "MaxAuthTries set to $max_tries"
     else
         check_warn "MaxAuthTries not configured"
     fi
     
-    if grep -q "^Protocol 2" "$config_file"; then
+    if sudo grep -q "^Protocol 2" "$config_file" 2>/dev/null; then
         check_pass "SSH Protocol 2 enforced"
     else
         check_warn "SSH Protocol setting not found (default is usually 2)"
@@ -109,7 +109,7 @@ else
 fi
 
 # Check SSH port configuration
-ssh_port=$(grep -E "^Port\s+|^#Port\s+" /etc/ssh/sshd_config /etc/ssh/sshd_config.d/* 2>/dev/null | grep -v "^#" | tail -1 | awk '{print $2}' || echo "22")
+ssh_port=$(sudo grep -E "^Port\s+|^#Port\s+" /etc/ssh/sshd_config /etc/ssh/sshd_config.d/* 2>/dev/null | grep -v "^#" | tail -1 | awk '{print $2}' || echo "22")
 if [[ "$ssh_port" == "2222" ]]; then
     check_pass "SSH port configured to 2222"
 elif [[ "$ssh_port" == "22" ]]; then
@@ -210,29 +210,29 @@ if command -v fail2ban-server &>/dev/null; then
         check_pass "fail2ban local configuration exists"
         
         # Check SSH jail configuration
-        if grep -A10 "\[sshd\]" /etc/fail2ban/jail.local | grep -q "enabled = true"; then
+        if sudo grep -A10 "\[sshd\]" /etc/fail2ban/jail.local 2>/dev/null | grep -q "enabled = true"; then
             check_pass "SSH jail is enabled"
         else
             check_warn "SSH jail configuration not found or not enabled"
         fi
         
         # Check for custom settings
-        if grep -q "bantime" /etc/fail2ban/jail.local; then
-            bantime=$(grep "bantime" /etc/fail2ban/jail.local | head -1 | awk '{print $3}')
+        if sudo grep -q "bantime" /etc/fail2ban/jail.local 2>/dev/null; then
+            bantime=$(sudo grep "bantime" /etc/fail2ban/jail.local 2>/dev/null | head -1 | awk '{print $3}')
             check_pass "Custom bantime configured: $bantime"
         else
             check_warn "Custom bantime not configured (using defaults)"
         fi
         
-        if grep -q "findtime" /etc/fail2ban/jail.local; then
-            findtime=$(grep "findtime" /etc/fail2ban/jail.local | head -1 | awk '{print $3}')
+        if sudo grep -q "findtime" /etc/fail2ban/jail.local 2>/dev/null; then
+            findtime=$(sudo grep "findtime" /etc/fail2ban/jail.local 2>/dev/null | head -1 | awk '{print $3}')
             check_pass "Custom findtime configured: $findtime"
         else
             check_warn "Custom findtime not configured (using defaults)"
         fi
         
-        if grep -q "maxretry" /etc/fail2ban/jail.local; then
-            maxretry=$(grep "maxretry" /etc/fail2ban/jail.local | head -1 | awk '{print $3}')
+        if sudo grep -q "maxretry" /etc/fail2ban/jail.local 2>/dev/null; then
+            maxretry=$(sudo grep "maxretry" /etc/fail2ban/jail.local 2>/dev/null | head -1 | awk '{print $3}')
             check_pass "Custom maxretry configured: $maxretry"
         else
             check_warn "Custom maxretry not configured (using defaults)"
@@ -275,7 +275,7 @@ fi
 
 # Check kernel parameters (if any sysctl hardening was applied)
 if [[ -f "/etc/sysctl.d/99-hardening.conf" ]] || [[ -f "/etc/sysctl.conf" ]]; then
-    if grep -q "net.ipv4.ip_forward" /etc/sysctl.conf /etc/sysctl.d/* 2>/dev/null; then
+    if sudo grep -q "net.ipv4.ip_forward" /etc/sysctl.conf /etc/sysctl.d/* 2>/dev/null; then
         check_pass "Kernel IP forwarding configuration found"
     else
         check_warn "Kernel hardening parameters not found (may not be needed)"

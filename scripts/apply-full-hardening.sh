@@ -2,8 +2,26 @@
 # ASW Framework Full Server Hardening Script
 # Run this LOCALLY on the server after bootstrap
 # This completes all security hardening in one go
+# Enhanced with comprehensive validation and logging
 
 set -e
+
+# Generate timestamp and log paths
+TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+LOG_FILE="/opt/asw/logs/hardening-${TIMESTAMP}.log"
+REPORT_FILE="/opt/asw/logs/hardening-${TIMESTAMP}.md"
+
+# Ensure log directory exists
+sudo mkdir -p /opt/asw/logs
+
+# Logging functions (enhanced)
+log_to_file() {
+    echo "$(date '+%H:%M:%S') - $1" | sudo tee -a "$LOG_FILE" > /dev/null
+}
+
+log_to_report() {
+    echo "$1" | sudo tee -a "$REPORT_FILE" > /dev/null
+}
 
 # Color codes
 RED='\033[0;31m'
@@ -12,11 +30,38 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-# Logging functions
-log_info() { echo -e "${GREEN}[INFO]${NC} $1"; }
-log_warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
-log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
-log_action() { echo -e "${BLUE}[ACTION]${NC} $1"; }
+# Enhanced logging functions
+log_info() { 
+    echo -e "${GREEN}[INFO]${NC} $1"; 
+    log_to_file "[INFO] $1"
+    log_to_report "✅ $1"
+}
+log_warn() { 
+    echo -e "${YELLOW}[WARN]${NC} $1"; 
+    log_to_file "[WARN] $1"
+    log_to_report "⚠️ $1"
+}
+log_error() { 
+    echo -e "${RED}[ERROR]${NC} $1"; 
+    log_to_file "[ERROR] $1"
+    log_to_report "❌ $1"
+}
+log_action() { 
+    echo -e "${BLUE}[ACTION]${NC} $1"; 
+    log_to_file "[ACTION] $1"
+    log_to_report "🔧 $1"
+}
+
+# Initialize report file
+log_to_report "# ASW Framework Security Hardening Report"
+log_to_report ""
+log_to_report "**Started**: $(date '+%Y-%m-%d %H:%M:%S')"
+log_to_report "**Server**: $(hostname)"
+log_to_report "**User**: $(whoami)"
+log_to_report "**Log File**: $LOG_FILE"
+log_to_report ""
+log_to_report "## Hardening Process"
+log_to_report ""
 
 # Header
 echo ""
@@ -24,6 +69,7 @@ echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━
 echo -e "${GREEN}     ASW Framework - Complete Server Hardening Script${NC}"
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
+log_to_file "Starting ASW Framework Server Hardening"
 
 # Check if running as cc-user with sudo
 if [[ "$USER" != "cc-user" ]]; then
@@ -391,10 +437,86 @@ validate_hardening() {
     echo ""
 }
 
+# Run comprehensive validation check
+run_comprehensive_validation() {
+    log_info "Running comprehensive Phase 2 validation check..."
+    log_to_report ""
+    log_to_report "## Comprehensive Validation Results"
+    log_to_report ""
+    
+    # Check if validation script exists locally
+    if [[ -f "/opt/asw/scripts/check-phase-02-hardening.sh" ]]; then
+        # Run validation with sudo and capture output
+        local validation_output
+        validation_output=$(sudo bash /opt/asw/scripts/check-phase-02-hardening.sh 2>&1)
+        
+        # Extract key results
+        local validation_summary=$(echo "$validation_output" | grep -E "(PASSED|FAILED|checks passed|warnings)" | tail -5)
+        
+        # Log to files
+        log_to_file "Validation Results: $validation_summary"
+        log_to_report "\`\`\`"
+        log_to_report "$validation_output"
+        log_to_report "\`\`\`"
+        
+        echo "$validation_output"
+        
+        # Check if validation passed
+        if echo "$validation_output" | grep -q "PASSED"; then
+            log_info "✅ Phase 2 validation PASSED"
+            return 0
+        else
+            log_error "❌ Phase 2 validation FAILED"
+            return 1
+        fi
+    else
+        log_warn "Validation script not found, skipping comprehensive check"
+        return 0
+    fi
+}
+
+# Send logs back to driving server
+send_logs_to_driving_server() {
+    log_info "Preparing to send logs back to driving server..."
+    
+    # Get the IP of the connection (driving server)
+    local driving_server_ip
+    driving_server_ip=$(who am i | awk '{print $5}' | tr -d '()' | cut -d: -f1)
+    
+    if [[ -n "$driving_server_ip" && "$driving_server_ip" != "localhost" ]]; then
+        log_info "Detected driving server IP: $driving_server_ip"
+        
+        # Try to copy logs back (requires SSH key access)
+        if command -v scp >/dev/null 2>&1; then
+            log_action "Attempting to send logs back to driving server..."
+            
+            # Try to send logs back (this may fail if SSH agent forwarding doesn't work backward)
+            if scp -o ConnectTimeout=5 -o StrictHostKeyChecking=no \
+                "$LOG_FILE" "$REPORT_FILE" \
+                "$driving_server_ip:/opt/asw/logs/" 2>/dev/null; then
+                log_info "✅ Logs successfully sent to driving server"
+            else
+                log_warn "Could not send logs to driving server (SSH key access required)"
+                log_info "Logs available locally at:"
+                log_info "  - $LOG_FILE"
+                log_info "  - $REPORT_FILE"
+            fi
+        else
+            log_warn "scp not available, logs remain on local server"
+        fi
+    else
+        log_info "Local execution detected, logs available at:"
+        log_info "  - $LOG_FILE"
+        log_info "  - $REPORT_FILE"
+    fi
+}
+
 # Main execution
 main() {
     log_info "Starting comprehensive server hardening..."
     log_info "This may take a few minutes..."
+    log_info "Logs will be written to: $LOG_FILE"
+    log_info "Report will be written to: $REPORT_FILE"
     echo ""
     
     # Run all hardening steps
@@ -406,8 +528,31 @@ main() {
     setup_cc_user_environment
     setup_monitoring
     
-    # Validate
+    # Run original basic validation
     validate_hardening
+    
+    # Run comprehensive validation
+    log_to_report ""
+    log_to_report "---"
+    run_comprehensive_validation
+    
+    # Finalize report
+    log_to_report ""
+    log_to_report "---"
+    log_to_report ""
+    log_to_report "## Summary"
+    log_to_report ""
+    log_to_report "**Completed**: $(date '+%Y-%m-%d %H:%M:%S')"
+    log_to_report "**Status**: Phase 2 Security Hardening Complete"
+    log_to_report ""
+    log_to_report "### Security Features Implemented"
+    log_to_report "- ✅ SSH hardening with key-only authentication"
+    log_to_report "- ✅ UFW firewall with minimal ports"
+    log_to_report "- ✅ fail2ban intrusion prevention"
+    log_to_report "- ✅ Automatic security updates"
+    log_to_report "- ✅ Kernel security hardening"
+    log_to_report "- ✅ System monitoring tools"
+    log_to_report "- ✅ CC User environment (tmux, shell, Claude Code)"
     
     # Success message
     echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -423,6 +568,10 @@ main() {
     echo "  • System monitoring tools"
     echo "  • CC User environment (tmux, shell, Claude Code)"
     echo ""
+    
+    # Send logs back to driving server
+    send_logs_to_driving_server
+    
     log_info "Next step: Install ASW development framework"
     echo "  npm install -g @jtjiver/agentic-framework-infrastructure"
     echo "  npm install -g @jtjiver/agentic-framework-dev"
