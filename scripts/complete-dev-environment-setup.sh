@@ -171,6 +171,11 @@ else
     log_info "Port registry already exists"
 fi
 
+# Create project subdirectories
+log_action "Creating project directories..."
+mkdir -p /opt/asw/projects/{personal,clients,experiments}
+log_info "✓ Project directories created (personal, clients, experiments)"
+
 # Step 6: Configure Docker (if installed)
 if command -v docker &> /dev/null; then
     log_action "Configuring Docker..."
@@ -347,6 +352,55 @@ echo "  • Commands available: $commands_found"
 echo "  • Port management: Ready"
 echo "  • Development tools: Installed"
 
+# Step 10: Setup GitHub SSH keys
+setup_github_ssh() {
+    log_action "Setting up GitHub SSH access..."
+    log_to_report ""
+    log_to_report "## GitHub SSH Setup"
+    log_to_report ""
+    
+    # Check if setup script exists
+    if [[ -f "/opt/asw/scripts/setup-github-ssh.sh" ]]; then
+        log_info "🔑 GitHub SSH setup is available"
+        echo ""
+        echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo -e "${YELLOW}     GitHub SSH Key Setup Available${NC}"
+        echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo ""
+        echo "🔐 To enable secure GitHub access with SSH keys:"
+        echo "   Run: /opt/asw/scripts/setup-github-ssh.sh"
+        echo ""
+        echo "📋 This will:"
+        echo "  • Generate ED25519 SSH key for this server"
+        echo "  • Show public key for GitHub setup"
+        echo "  • Convert all repositories to SSH"
+        echo "  • Test GitHub connectivity"
+        echo ""
+        
+        # Interactive setup option
+        read -p "Would you like to set up GitHub SSH keys now? (y/n): " -r
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            log_action "Running GitHub SSH setup..."
+            if bash /opt/asw/scripts/setup-github-ssh.sh; then
+                log_info "✅ GitHub SSH setup completed successfully"
+                log_to_report "- ✅ GitHub SSH keys configured and repositories converted to SSH"
+            else
+                log_warn "⚠️ GitHub SSH setup encountered issues"
+                log_to_report "- ⚠️ GitHub SSH setup incomplete (manual completion may be needed)"
+            fi
+        else
+            log_info "ℹ️ GitHub SSH setup skipped (can be run later)"
+            log_to_report "- ℹ️ GitHub SSH setup available but skipped"
+        fi
+    else
+        log_warn "GitHub SSH setup script not found"
+        log_to_report "- ⚠️ GitHub SSH setup script not available"
+    fi
+}
+
+# Run GitHub SSH setup
+setup_github_ssh
+
 # Run comprehensive validation
 log_to_report ""
 log_to_report "---"
@@ -369,6 +423,7 @@ log_to_report "- ✅ ASW framework packages linked globally"
 log_to_report "- ✅ Command symlinks created"
 log_to_report "- ✅ Port management system initialized"
 log_to_report "- ✅ Development environment script created"
+log_to_report "- ✅ GitHub SSH key setup automation available"
 
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${GREEN}     🎉 Development Environment Setup Complete!${NC}"

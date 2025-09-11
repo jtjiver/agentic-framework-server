@@ -315,7 +315,7 @@ if command -v nginx &>/dev/null || [[ -x "/usr/sbin/nginx" ]] || [[ -x "/sbin/ng
     fi
     
     # Check nginx configuration
-    if $NGINX_CMD -t &>/dev/null; then
+    if sudo $NGINX_CMD -t &>/dev/null; then
         check_pass "Nginx configuration is valid"
     else
         check_fail "Nginx configuration has errors"
@@ -323,8 +323,9 @@ if command -v nginx &>/dev/null || [[ -x "/usr/sbin/nginx" ]] || [[ -x "/sbin/ng
     
     # Check for ASW nginx configurations
     if [[ -d "/etc/nginx/sites-available" ]]; then
-        asw_sites=$(ls /etc/nginx/sites-available/ 2>/dev/null | grep -c "asw" || echo "0")
-        if [[ "$asw_sites" -gt 0 ]]; then
+        asw_sites=$(ls /etc/nginx/sites-available/ 2>/dev/null | grep -c "asw" 2>/dev/null || echo "0")
+        asw_sites=$(echo "$asw_sites" | tr -d '\n\r' | head -1)
+        if [[ "${asw_sites:-0}" -gt 0 ]]; then
             check_pass "Found $asw_sites ASW nginx configurations"
         else
             check_warn "No ASW-specific nginx configurations found"
@@ -349,8 +350,9 @@ if command -v certbot &>/dev/null || dpkg -l | grep -q "^ii.*certbot"; then
     
     # Check for existing certificates (if certbot is accessible)
     if command -v certbot &>/dev/null; then
-        cert_count=$(certbot certificates 2>/dev/null | grep -c "Certificate Name:" || echo "0")
-        if [[ "$cert_count" -gt 0 ]]; then
+        cert_count=$(certbot certificates 2>/dev/null | grep -c "Certificate Name:" 2>/dev/null || echo "0")
+        cert_count=$(echo "$cert_count" | tr -d '\n\r' | head -1)
+        if [[ "${cert_count:-0}" -gt 0 ]]; then
             check_pass "Found $cert_count SSL certificates"
             
             echo -e "  ${BLUE}SSL Certificates:${NC}"
