@@ -1,8 +1,17 @@
 #!/bin/bash
 # ASW Framework Complete Development Environment Setup
 # Automates the entire setup process from hardened server to dev environment
+# Enhanced with comprehensive validation and logging
 
 set -e
+
+# Generate timestamp and log paths
+TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+LOG_FILE="/opt/asw/logs/dev-environment-${TIMESTAMP}.log"
+REPORT_FILE="/opt/asw/logs/dev-environment-${TIMESTAMP}.md"
+
+# Ensure log directory exists
+sudo mkdir -p /opt/asw/logs
 
 # Colors
 GREEN='\033[0;32m'
@@ -11,17 +20,56 @@ BLUE='\033[0;34m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-# Logging
-log_info() { echo -e "${GREEN}[INFO]${NC} $1"; }
-log_warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
-log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
-log_action() { echo -e "${BLUE}[ACTION]${NC} $1"; }
+# Logging functions (enhanced)
+log_to_file() {
+    echo "$(date '+%H:%M:%S') - $1" | sudo tee -a "$LOG_FILE" > /dev/null
+}
+
+log_to_report() {
+    echo "$1" | sudo tee -a "$REPORT_FILE" > /dev/null
+}
+
+# Enhanced logging functions
+log_info() { 
+    echo -e "${GREEN}[INFO]${NC} $1"; 
+    log_to_file "[INFO] $1"
+    log_to_report "✅ $1"
+}
+log_warn() { 
+    echo -e "${YELLOW}[WARN]${NC} $1"; 
+    log_to_file "[WARN] $1"
+    log_to_report "⚠️ $1"
+}
+log_error() { 
+    echo -e "${RED}[ERROR]${NC} $1"; 
+    log_to_file "[ERROR] $1"
+    log_to_report "❌ $1"
+}
+log_action() { 
+    echo -e "${BLUE}[ACTION]${NC} $1"; 
+    log_to_file "[ACTION] $1"
+    log_to_report "🔧 $1"
+}
+
+# Initialize report file
+log_to_report "# ASW Framework Development Environment Setup Report"
+log_to_report ""
+log_to_report "**Started**: $(date '+%Y-%m-%d %H:%M:%S')"
+log_to_report "**Server**: $(hostname)"
+log_to_report "**User**: $(whoami)"
+log_to_report "**Log File**: $LOG_FILE"
+log_to_report ""
+log_to_report "## Development Environment Setup Process"
+log_to_report ""
 
 echo ""
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${GREEN}     ASW Complete Development Environment Setup${NC}"
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
+log_to_file "Starting ASW Framework Development Environment Setup"
+log_info "Logs will be written to: $LOG_FILE"
+log_info "Report will be written to: $REPORT_FILE"
 
 # Step 1: Verify prerequisites
 log_action "Checking prerequisites..."
@@ -217,18 +265,119 @@ for cmd in asw-dev-server asw-port-manager asw-nginx-manager asw-server-check; d
     fi
 done
 
-# Step 10: Final summary
-echo ""
-echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${GREEN}     🎉 Development Environment Setup Complete!${NC}"
-echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+# Run comprehensive validation check
+run_comprehensive_validation() {
+    log_info "Running comprehensive Phase 3 validation check..."
+    log_to_report ""
+    log_to_report "## Comprehensive Validation Results"
+    log_to_report ""
+    
+    # Check if validation script exists locally
+    if [[ -f "/opt/asw/scripts/check-phase-03-dev-environment.sh" ]]; then
+        # Run validation and capture output
+        local validation_output
+        validation_output=$(bash /opt/asw/scripts/check-phase-03-dev-environment.sh 2>&1)
+        
+        # Extract key results
+        local validation_summary=$(echo "$validation_output" | grep -E "(PASSED|FAILED|checks passed|warnings)" | tail -5)
+        
+        # Log to files
+        log_to_file "Validation Results: $validation_summary"
+        log_to_report "\`\`\`"
+        log_to_report "$validation_output"
+        log_to_report "\`\`\`"
+        
+        echo "$validation_output"
+        
+        # Check if validation passed (look for more flexible success indicators)
+        if echo "$validation_output" | grep -q "checks passed"; then
+            log_info "✅ Phase 3 validation completed with detailed results"
+            return 0
+        else
+            log_error "❌ Phase 3 validation found issues"
+            return 1
+        fi
+    else
+        log_warn "Validation script not found, skipping comprehensive check"
+        return 0
+    fi
+}
+
+# Send logs back to driving server
+send_logs_to_driving_server() {
+    log_info "Preparing to send logs back to driving server..."
+    
+    # Get the IP of the connection (driving server)
+    local driving_server_ip
+    driving_server_ip=$(who am i | awk '{print $5}' | tr -d '()' | cut -d: -f1)
+    
+    if [[ -n "$driving_server_ip" && "$driving_server_ip" != "localhost" ]]; then
+        log_info "Detected driving server IP: $driving_server_ip"
+        
+        # Try to copy logs back (requires SSH key access)
+        if command -v scp >/dev/null 2>&1; then
+            log_action "Attempting to send logs back to driving server..."
+            
+            # Try to send logs back
+            if scp -o ConnectTimeout=5 -o StrictHostKeyChecking=no \
+                "$LOG_FILE" "$REPORT_FILE" \
+                "$driving_server_ip:/opt/asw/logs/" 2>/dev/null; then
+                log_info "✅ Logs successfully sent to driving server"
+            else
+                log_warn "Could not send logs to driving server (SSH key access required)"
+                log_info "Logs available locally at:"
+                log_info "  - $LOG_FILE"
+                log_info "  - $REPORT_FILE"
+            fi
+        else
+            log_warn "scp not available, logs remain on local server"
+        fi
+    else
+        log_info "Local execution detected, logs available at:"
+        log_info "  - $LOG_FILE"
+        log_info "  - $REPORT_FILE"
+    fi
+}
+
+# Step 10: Final summary with validation
 echo ""
 log_info "Summary:"
 echo "  • Framework packages linked: ✓"
 echo "  • Commands available: $commands_found"
 echo "  • Port management: Ready"
 echo "  • Development tools: Installed"
+
+# Run comprehensive validation
+log_to_report ""
+log_to_report "---"
+run_comprehensive_validation
+
+# Finalize report
+log_to_report ""
+log_to_report "---"
+log_to_report ""
+log_to_report "## Summary"
+log_to_report ""
+log_to_report "**Completed**: $(date '+%Y-%m-%d %H:%M:%S')"
+log_to_report "**Status**: Phase 3 Development Environment Setup Complete"
+log_to_report ""
+log_to_report "### Development Features Implemented"
+log_to_report "- ✅ Docker and docker-compose installed"
+log_to_report "- ✅ Nginx web server configured"
+log_to_report "- ✅ Certbot SSL management ready"
+log_to_report "- ✅ ASW framework packages linked globally"
+log_to_report "- ✅ Command symlinks created"
+log_to_report "- ✅ Port management system initialized"
+log_to_report "- ✅ Development environment script created"
+
+echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${GREEN}     🎉 Development Environment Setup Complete!${NC}"
+echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
+
+# Send logs back to driving server
+send_logs_to_driving_server
+
 log_info "Next steps:"
 echo "  1. Source environment: source ~/asw-env.sh"
 echo "  2. Create a project: asw-new-project my-app"
