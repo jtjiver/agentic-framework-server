@@ -419,6 +419,206 @@ The ASW framework now has full static website support alongside its existing dev
 
 ---
 
+## Multiple Sites on Same VPS
+
+The ASW framework and static website setup script support hosting multiple sites on the same VPS. Here are the common approaches:
+
+### 1. Different Domains (Most Common)
+
+Each site gets its own domain and nginx configuration:
+
+```bash
+# Site 1: casadaspedrasportugal.com (already set up)
+/var/www/casadaspedrasportugal.com/
+
+# Site 2: example.com
+./setup-static-website.sh example.com /var/www/example.com
+
+# Site 3: anotherdomain.com  
+./setup-static-website.sh anotherdomain.com /var/www/anotherdomain.com
+```
+
+### 2. Subdomains
+
+Multiple subdomains under one main domain:
+
+```bash
+# Main site: 8020perfect.com
+./setup-static-website.sh 8020perfect.com /var/www/8020perfect.com
+
+# Subdomain sites
+./setup-static-website.sh blog.8020perfect.com /var/www/blog.8020perfect.com
+./setup-static-website.sh portfolio.8020perfect.com /var/www/portfolio.8020perfect.com
+```
+
+### 3. Mixed: Static Sites + Development Projects
+
+The ASW framework supports both static websites and development projects:
+
+```bash
+# Static websites
+casadaspedrasportugal.com → /var/www/casadaspedrasportugal.com/
+example.com → /var/www/example.com/
+
+# Development projects (using asw-dev-server)
+tennis-tracker.dev.8020perfect.com → localhost:3009 (Next.js)
+api.dev.8020perfect.com → localhost:3010 (Node.js API)
+```
+
+---
+
+## Setup Process for Additional Sites
+
+### Adding Static Websites
+
+**Step 1: Prepare Project Repository**
+```bash
+# Option A: Clone existing repository
+ssh -A -p 2222 cc-user@VPS_IP "cd /opt/asw/projects/personal && git clone git@github.com:user/new-site.git"
+
+# Option B: Create new project structure
+ssh -A -p 2222 cc-user@VPS_IP "mkdir -p /opt/asw/projects/personal/new-site/{www,scripts}"
+```
+
+**Step 2: Deploy Website Files**
+```bash
+# If using existing deploy script
+ssh -A -p 2222 cc-user@VPS_IP "cd /opt/asw/projects/personal/new-site && ./scripts/deploy.sh"
+
+# Or manually copy files
+ssh -A -p 2222 cc-user@VPS_IP "sudo mkdir -p /var/www/newdomain.com && sudo rsync -avz /opt/asw/projects/personal/new-site/www/ /var/www/newdomain.com/"
+```
+
+**Step 3: Configure Nginx and SSL**
+```bash
+# Run static website setup script remotely
+ssh -A -p 2222 cc-user@VPS_IP "bash -s newdomain.com /var/www/newdomain.com your@email.com" < /opt/asw/scripts/setup-static-website.sh
+```
+
+**Step 4: Update DNS**
+```bash
+# Update DNS A records to point to VPS
+# newdomain.com → VPS_IP
+# www.newdomain.com → VPS_IP
+
+# Verify DNS propagation
+nslookup newdomain.com
+```
+
+**Step 5: Test and Verify**
+```bash
+# Test HTTP access
+curl -I http://newdomain.com
+
+# Setup will automatically configure SSL
+curl -I https://newdomain.com
+```
+
+### Adding Development Projects
+
+**Step 1: Clone Project**
+```bash
+ssh -A -p 2222 cc-user@VPS_IP "cd /opt/asw/projects/personal && git clone git@github.com:user/dev-project.git"
+```
+
+**Step 2: Install Dependencies**
+```bash
+ssh -A -p 2222 cc-user@VPS_IP "cd /opt/asw/projects/personal/dev-project && npm install"
+```
+
+**Step 3: Start Development Server**
+```bash
+ssh -A -p 2222 cc-user@VPS_IP "cd /opt/asw/projects/personal/dev-project && asw-dev-server start --https"
+```
+
+---
+
+## Multiple Sites Example Configuration
+
+### Nginx Sites Structure
+```
+/etc/nginx/sites-enabled/
+├── casadaspedrasportugal.com           # Static site
+├── example.com                         # Static site
+├── blog.8020perfect.com                # Static subdomain
+├── tennis-tracker.dev.8020perfect.com  # Dev project (proxy)
+└── api.dev.8020perfect.com             # Dev project (proxy)
+```
+
+### Web Directories Structure
+```
+/var/www/
+├── casadaspedrasportugal.com/          # Static files
+├── example.com/                        # Static files
+└── blog.8020perfect.com/               # Static files
+
+/opt/asw/projects/personal/
+├── casadaspedras-website/              # Source repository
+├── example-site/                       # Source repository
+├── blog-site/                          # Source repository
+├── tennis-tracker/                     # Dev project
+└── api-project/                        # Dev project
+```
+
+### SSL Certificates
+```
+/etc/letsencrypt/live/
+├── casadaspedrasportugal.com/
+├── example.com/
+├── blog.8020perfect.com/
+├── tennis-tracker.dev.8020perfect.com/
+└── api.dev.8020perfect.com/
+```
+
+---
+
+## Resource Considerations
+
+### VPS Capacity
+- **Static Sites**: Very lightweight, can host dozens
+- **Development Projects**: More resource intensive, monitor:
+  - CPU usage with `htop`
+  - Memory usage with `free -h`
+  - Disk space with `df -h`
+
+### Port Management
+- ASW port registry: `/opt/asw/projects/.ports-registry.json`
+- Static sites use nginx (port 80/443)
+- Dev projects use assigned ports (3000+)
+
+### Monitoring
+```bash
+# Check all nginx sites
+sudo nginx -T
+
+# Check active development servers  
+ssh -A -p 2222 cc-user@VPS_IP "ps aux | grep node"
+
+# Check port usage
+ssh -A -p 2222 cc-user@VPS_IP "ss -tulpn | grep LISTEN"
+```
+
+---
+
+## Quick Setup Commands
+
+### Add New Static Site
+```bash
+# One-liner for static site setup
+DOMAIN="newsite.com" && VPS_IP="152.53.136.76" && EMAIL="your@email.com" && ssh -A -p 2222 cc-user@$VPS_IP "sudo mkdir -p /var/www/$DOMAIN && echo '<h1>$DOMAIN</h1>' | sudo tee /var/www/$DOMAIN/index.html > /dev/null" && ssh -A -p 2222 cc-user@$VPS_IP "bash -s $DOMAIN /var/www/$DOMAIN $EMAIL" < /opt/asw/scripts/setup-static-website.sh
+```
+
+### Add New Development Project
+```bash
+# Clone and start dev project
+PROJECT="new-project" && VPS_IP="152.53.136.76" && ssh -A -p 2222 cc-user@$VPS_IP "cd /opt/asw/projects/personal && git clone git@github.com:user/$PROJECT.git && cd $PROJECT && npm install && asw-dev-server start --https"
+```
+
+The ASW framework now provides complete multi-site hosting capabilities with both static websites and development projects on a single VPS.
+
+---
+
 **Migration completed:** September 11, 2025  
 **Total time:** ~2 hours including DNS propagation  
-**Result:** Production-ready HTTPS website with ASW management
+**Result:** Production-ready HTTPS website with ASW management  
+**Multi-site capability:** Ready for unlimited additional sites
