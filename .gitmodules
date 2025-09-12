@@ -1,0 +1,3 @@
+[submodule "agentic-claude-config"]
+	path = agentic-claude-config
+	url = git@github.com:jtjiver/agentic-claude-config.git
