@@ -71,7 +71,37 @@ get_secret "DATABASE_URL"    # → MyAwesomeApp-Secrets
 ~/.config/op/                     # 1Password CLI
 ```
 
-### Example 3: Agency with Multiple Clients (Full VPS)
+### Example 3: Claude Code Config Only
+**Scenario**: You just want Claude Code configuration without other framework components
+
+```bash
+# Set up project directory
+PROJECT_DIR=test
+echo ${PROJECT_DIR}
+mkdir ${PROJECT_DIR} && cd ${PROJECT_DIR} && pwd
+
+# Clone the Claude config
+git clone https://github.com/jtjiver/agentic-claude-config.git 
+
+# Run setup scripts
+./agentic-claude-config/cli/prereq-check.sh
+./agentic-claude-config/cli/configure-claude.sh
+
+# Set up ElevenLabs API key (if using TTS)
+# If .env doesn't exist:
+# echo "ELEVENLABS_API_KEY=$(op item get "elevenlabs - API - claude-code" --vault "TennisTracker-Dev-Vault" --fields label=credential --reveal)" > .env
+
+# If .env exists, update the key:
+sed -i '' "s/^ELEVENLABS_API_KEY=.*/ELEVENLABS_API_KEY=$(op item get "elevenlabs - API - claude-code" --vault "TennisTracker-Dev-Vault" --fields label=credential --reveal)/" .env
+
+# Verify setup
+# more .env
+
+# Test with TTS feedback
+claude -p "will it rain"
+```
+
+### Example 4: Agency with Multiple Clients (Full VPS)
 **Scenario**: You host multiple client projects in containers
 
 ```bash
