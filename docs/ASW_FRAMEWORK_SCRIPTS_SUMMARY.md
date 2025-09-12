@@ -3,6 +3,58 @@
 ## Overview
 The ASW (Agentic Secure Workflow) Framework consists of four interconnected repositories that provide a comprehensive development, deployment, and security management system for web applications.
 
+## Framework Setup & Configuration
+
+### Main Setup Script (`/setup.sh`)
+**Purpose**: Primary framework installation script that sets up the complete ASW environment
+
+**Key Features**:
+- Multi-repository cloning and updating (core, security, dev, infrastructure)
+- NPM package installation for global CLI tools
+- Project directory structure creation with proper permissions
+- Optional Claude configuration integration
+- Git status management for ignored framework directories
+- Secrets directory setup with 1Password integration
+
+**Installation Flow**:
+1. Repository validation and cloning/updating
+2. Global NPM package installation
+3. Directory structure creation (`projects/{personal,clients,experiments,containers}`)
+4. Secrets management setup (`.secrets/` directory)
+5. Permission configuration for cc-user
+
+### Claude Code Configuration System (`agentic-claude-config/`)
+**Purpose**: Golden source Claude Code configuration with project-specific customization
+
+#### CLI Installation (`/cli/install-config.sh`)
+**Advanced Features**:
+- **Golden Source Architecture**: Centralized configuration with project-specific overrides
+- **Directory Structure**: Organized commands into `core/`, `project/`, and `local/` directories
+- **Project Validation**: Comprehensive validation to prevent self-installation
+- **Backup System**: Automatic backup of existing configurations with timestamps
+- **Customization Layers**: Project-wide vs developer-local customization support
+- **NPM Integration**: Can run as postinstall script for automated setup
+
+**Directory Structure Created**:
+```
+.claude/
+├── commands/
+│   ├── core/           # Framework commands (committed)
+│   ├── project/        # Project-specific commands (committed)
+│   └── local/          # Developer-local commands (gitignored)
+├── hooks/
+│   ├── project/        # Project hooks (committed)
+│   └── local/          # Developer hooks (gitignored)
+├── settings.json       # Claude configuration
+└── .gitignore          # Excludes local/ directories
+```
+
+**Installation Validation**:
+- Required file/directory verification
+- Command and hook counting
+- Permission setting for shell scripts
+- Next steps guidance with available commands
+
 ## Repository Architecture
 
 ### 1. agentic-framework-core
@@ -268,17 +320,170 @@ asw-server-check → system-health-check.sh → email notifications
 3. **Security Compliance**: Regular `asw-scan` and security updates
 4. **Monitoring**: Automated health checks with email alerts
 
+## Advanced Framework Features
+
+### 1. Modular Dependency Management System
+**Innovation**: Template-based installer framework with standardized interfaces
+
+**Architecture**:
+- Pluggable installer system via `installers/install-{dependency}.sh` pattern
+- Standardized check → install → ensure workflow
+- Cross-platform support with fallback mechanisms
+- GitHub API integration for latest release detection
+- User vs system installation with PATH management
+
+**Usage**:
+```bash
+./dependency-manager.sh ensure trufflehog github-cli   # Install multiple dependencies
+./dependency-manager.sh check docker                   # Check single dependency
+./dependency-manager.sh list                          # Show available installers
+```
+
+### 2. Comprehensive Resource Cleanup Automation
+**Innovation**: Multi-layer cleanup system with intelligent detection
+
+**Cleanup Targets**:
+- **SSH Agents**: Orphaned sockets older than 24 hours
+- **Tmux Sessions**: Idle sessions with 24+ hour timeout
+- **Docker Resources**: Containers (7+ days), volumes, dangling images
+- **Temporary Directories**: Claude, ASW test dirs, Cursor temp files
+- **Zombie Processes**: Process tree cleanup with safety mechanisms
+- **VSCode/Cursor Processes**: Remote server cleanup on disconnect
+
+**Installation Methods**:
+- Systemd service with 6-hour timer
+- SSH logout hooks via `.bash_logout`
+- Cron job backup (hourly)
+- ForceCommand SSH wrapper for immediate cleanup
+
+### 3. Production-Ready Bash Logging Framework
+**Innovation**: Structured logging with emoji indicators and automatic rotation
+
+**Features**:
+- **Multi-level Logging**: DEBUG, INFO, WARNING, ERROR, SUCCESS, ACTION
+- **Automatic Rotation**: Date-based rotation with configurable retention
+- **Project-Aware**: Auto-detects script names and project contexts
+- **Performance Optimized**: Function caching and thread-safe operations
+- **Dual Output**: Console and file logging with independent control
+
+**Configuration System**:
+- Project-specific `.logger.conf` files
+- Environment variable overrides
+- Auto-rotation settings
+- PID logging for debugging
+
+### 4. Interactive Development Dashboard
+**Innovation**: User-friendly container management with comprehensive features
+
+**Dashboard Capabilities**:
+- Real-time container status monitoring
+- Interactive menu system with numbered selection
+- Multiple access methods (shell, root, logs, details, custom commands)
+- Docker context management and switching
+- VS Code remote development integration
+- SSH port forwarding guidance with tunnel setup
+
+**Access Patterns**:
+```bash
+./dev-dashboard.sh                    # Interactive menu
+./dev-dashboard.sh my-container       # Direct container access
+./dev-dashboard.sh --vscode-setup     # VS Code integration guide
+```
+
+### 5. Advanced Project Creation System
+**Innovation**: Comprehensive validation and template-specific configuration
+
+**Creation Workflow**:
+1. **Pre-creation Validation**: Resource conflict detection across Docker/ports/domains
+2. **Template-Specific Setup**: Dynamic port allocation by project type
+3. **Network Configuration**: Nginx proxy with HTTP → HTTPS upgrade
+4. **SSL Automation**: Let's Encrypt integration with fallback certificates
+5. **Build Validation**: Template-specific functionality testing
+6. **Dashboard Integration**: Project registration and metadata creation
+
+**Template Support**:
+- **NextJS TypeScript**: 4 ports (app, debug, storybook, docs)
+- **Python FastAPI**: 3 ports (app, debug, docs) with OpenAPI
+- **Payload CMS**: Complex setup with MongoDB integration
+- **Universal**: Flexible 2-port configuration
+
+### 6. Intelligent Session Management
+**Innovation**: Cross-environment tmux orchestration with auto-discovery
+
+**Session Types**:
+- **VPS Sessions**: Persistent `vps-claude` and `vps-project` sessions
+- **Container Sessions**: Auto-discovered development containers
+- **Framework Integration**: Path detection across installation methods
+- **Interactive Menu**: Timeout handling and quick connect options
+
+**Auto-Discovery Features**:
+- Running container detection
+- Framework installation path resolution
+- Tmux auto-installation in containers
+- Working directory standardization
+
+### 7. Security-First Architecture
+**Innovation**: Comprehensive security integration at every layer
+
+**Security Components**:
+- **1Password Integration**: Vault context management across all scripts
+- **Secret Scanning**: TruffleHog integration with automated detection
+- **Container Hardening**: Security configuration for development containers
+- **SSH Security**: Agent cleanup, session monitoring, key rotation reminders
+- **Process Monitoring**: Zombie detection and resource monitoring
+
+### 8. Template-Based Configuration System
+**Innovation**: Golden source with project-specific customization layers
+
+**Configuration Layers**:
+- **Core Commands**: Framework-provided slash commands
+- **Project Commands**: Team-shared project-specific commands
+- **Local Commands**: Developer-personal commands (gitignored)
+- **Hooks**: Multi-layer hook system with project/local separation
+
+**Validation & Safety**:
+- Self-installation prevention
+- Comprehensive project validation
+- Automatic backup with timestamps
+- Dry-run preview mode
+
 ## Configuration Files
 - **Port Registry**: `/opt/asw/projects/.ports-registry.json`
 - **Nginx Configs**: `/etc/nginx/sites-available/`
 - **SSL Certificates**: `/etc/letsencrypt/live/`
 - **Project State**: `.asw-dev-server.state` (per project)
 - **Security Contexts**: 1Password vault sessions
+- **Logger Configs**: `.logger.conf` (per project)
+- **Framework Paths**: `/opt/asw/` (standard installation)
+- **Claude Configs**: `.claude/` (per project with golden source)
 
 ## Environment Requirements
 - **OS**: Ubuntu/Debian Linux
 - **Services**: Nginx, UFW, Certbot, Docker
 - **External**: 1Password CLI, GitHub CLI
 - **Network**: Domain with wildcard DNS (*.dev.domain.com)
+- **Development**: tmux, Node.js, Python (version-specific per template)
 
-This framework provides a complete, security-first development workflow from project inception to production deployment, with comprehensive automation and monitoring capabilities.
+## Novel Functionality Summary
+
+**System Management**:
+- Modular dependency management with cross-platform support
+- Multi-layer resource cleanup automation
+- Intelligent session orchestration across environments
+
+**Development Experience**:
+- Interactive dashboard with comprehensive container management
+- Template-based project creation with validation
+- Production-ready logging framework with structured output
+
+**Security & Configuration**:
+- Golden source configuration with customization layers
+- Comprehensive security integration (1Password, secret scanning, hardening)
+- SSH session management with cleanup automation
+
+**Infrastructure Automation**:
+- HTTP → HTTPS upgrade workflows
+- SSL certificate automation with Let's Encrypt
+- Port management with conflict detection and auto-allocation
+
+This framework provides a complete, security-first development workflow from project inception to production deployment, with comprehensive automation, monitoring capabilities, and novel approaches to common development environment challenges.
