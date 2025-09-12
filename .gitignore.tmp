@@ -1,5 +1,5 @@
 # Framework packages (installed separately - not part of server repo)
-agentic-framework-core/
+agentic-framework-security/
 agentic-framework-dev/
 agentic-framework-infrastructure/
 
