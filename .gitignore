@@ -1,7 +1,5 @@
 # Framework packages (installed separately - not part of server repo)
-agentic-framework-core/
-agentic-framework-dev/
-agentic-framework-infrastructure/
+# Submodules are tracked by git, not ignored
 
 # NPM packages (managed separately)
 node_modules/

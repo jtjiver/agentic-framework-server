@@ -7,3 +7,9 @@
 [submodule "agentic-framework-security"]
 	path = agentic-framework-security
 	url = git@github.com:jtjiver/agentic-framework-security.git
+[submodule "agentic-framework-dev"]
+	path = agentic-framework-dev
+	url = git@github.com:jtjiver/agentic-framework-dev.git
+[submodule "agentic-framework-infrastructure"]
+	path = agentic-framework-infrastructure
+	url = git@github.com:jtjiver/agentic-framework-infrastructure.git
