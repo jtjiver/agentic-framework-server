@@ -18,11 +18,55 @@ The ASW (Agentic Secure Workflow) Framework consists of four interconnected repo
 - **`asw-scan`** - Security and code quality scanning
 - **`asw-doctor.cjs`** - System health diagnostics
 
+#### Supporting Libraries (`/lib/`)
+
+**Dependencies Management (`/lib/dependencies/`):**
+- `dependency-manager.sh` - Modular dependency management system with installer framework
+- `install-trufflehog.sh` - Cross-platform security scanner installer with GitHub API integration
+- `TEMPLATE-install-example.sh` - Template for creating standardized dependency installers
+
+**Housekeeping & Cleanup (`/lib/housekeeping/`):**
+- `cursor-cleanup.sh` - Comprehensive resource cleanup (SSH agents, tmux, Docker, temp dirs, zombies)
+- `install-cleanup.sh` - System-wide cleanup automation installer (systemd, cron, hooks)
+- `ssh-cleanup-hook.sh` - SSH session disconnect cleanup with VSCode/Cursor detection
+- `trash-cleanup.sh` - Interactive trash directory management with auto-discovery
+
+**Logging Framework (`/lib/logging/bash-logging-framework/`):**
+- `bash-logger.sh` - Production-ready logging with emoji indicators and rotation
+- `install.sh` - Multi-method installer (local, system, symlink, copy)
+- `example.sh` - Usage examples and best practices
+- `test.sh` - Logging framework test suite
+
+**Security Tools (`/lib/security/`):**
+- `1password-helper/` - Complete 1Password CLI integration suite
+- `1password-monitoring/` - Session management and security monitoring
+- `secret-scanner/` - TruffleHog integration and secret detection
+
+**Utilities (`/lib/utils/`):**
+- `asw-aliases.sh` - Framework command aliases and shortcuts
+- `bash-completion.sh` - Tab completion for ASW commands
+- `claude-native-updater.sh` - Claude Code CLI updater
+- `framework-summary.sh` - Installation and health summary
+- `git-with-ssh-check.sh` - Git operations with SSH validation
+- `health-check.sh` - System health validation
+- `login-banner.sh` - Customizable login information
+- `navigation-aliases.sh` - Directory navigation shortcuts
+- `ssh-refresh.sh` - SSH configuration refresh
+- `update-bashrc-paths.sh` - PATH management automation
+- `ssh-source.sh` - SSH environment sourcing
+
+**Versioning (`/lib/versioning/`):**
+- `bump-version.sh` - Automated version management
+
 #### Key Features
 - Repository initialization with security profiles (standard, foundational, secure)
 - GitHub integration with automatic repository creation
 - 1Password vault integration for credentials
 - Security scanning and compliance checking
+- Modular dependency management with installer templates
+- Comprehensive cleanup automation (systemd, cron, SSH hooks)
+- Production-ready logging framework with rotation
+- Interactive development environment management
 
 ### 2. agentic-framework-infrastructure
 **Purpose**: VPS server management, development server provisioning, and infrastructure automation
@@ -103,6 +147,36 @@ The ASW (Agentic Secure Workflow) Framework consists of four interconnected repo
 - **`create-project.sh`** - New project creation automation
 - **`dev-server.sh`** - Development server management
 - **`manage-containers.sh`** - Docker container lifecycle management
+
+#### Supporting Libraries (`/lib/`)
+
+**AI Assistant Session Management (`/ai-assistant/sessions/`):**
+- `claude-sessions.sh` - Comprehensive tmux session manager for VPS and containers
+- `start-claude-environment.sh` - Auto-starts Claude development environment
+- `deploy-to-vps.sh` - VPS deployment automation
+
+**Bootstrap System (`/bootstrap/`):**
+- `bootstrap-container.sh` - Complete container initialization with 9-phase approach
+- `harden-container.sh` - Security hardening for development containers
+
+**Project Management (`/projects/`):**
+- `create-project.sh` - Advanced project creation with comprehensive validation
+- Multi-template support (NextJS, Python FastAPI, Payload CMS, Universal)
+- Port management with template-specific allocation
+- SSL certificate automation and network configuration
+- Build validation and project registration
+
+**Monitoring (`/monitoring/`):**
+- `dev-dashboard.sh` - Interactive development container management dashboard
+- Container status monitoring with real-time updates
+- VS Code remote development integration
+- SSH port forwarding guidance
+
+**Container Management (`/containers/`):**
+- `container-manager.sh` - Advanced Docker container orchestration
+- Template-based container creation
+- Network and volume management
+- Health monitoring and auto-recovery
 
 ## Script Interactions & Dependencies
 

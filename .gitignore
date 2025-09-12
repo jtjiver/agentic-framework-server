@@ -3,7 +3,6 @@ agentic-framework-core/
 agentic-framework-security/
 agentic-framework-dev/
 agentic-framework-infrastructure/
-agentic-claude-config/
 
 # NPM packages (managed separately)
 node_modules/
