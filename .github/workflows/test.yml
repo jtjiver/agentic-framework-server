@@ -1,0 +1,214 @@
+name: ASW Framework Tests
+
+on:
+  push:
+    branches: [ main, master, develop ]
+    paths:
+      - 'scripts/**'
+      - 'agentic-framework-*/**'
+      - 'docker/test/**'
+      - 'package.json'
+      - '.github/workflows/**'
+  pull_request:
+    branches: [ main, master, develop ]
+    paths:
+      - 'scripts/**'
+      - 'agentic-framework-*/**'
+      - 'docker/test/**'
+      - 'package.json'
+      - '.github/workflows/**'
+  workflow_dispatch:
+    inputs:
+      test_type:
+        description: 'Type of tests to run'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+        - all
+        - syntax
+        - unit
+        - integration
+        - packages
+        - security
+
+env:
+  TEST_TIMEOUT: 1800
+  DOCKER_BUILDKIT: 1
+  COMPOSE_DOCKER_CLI_BUILD: 1
+
+jobs:
+  test:
+    name: Test Suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    
+    strategy:
+      matrix:
+        test-type: 
+          - ${{ github.event.inputs.test_type || 'all' }}
+      fail-fast: false
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        fetch-depth: 0
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Cache Docker layers
+      uses: actions/cache@v3
+      with:
+        path: /tmp/.buildx-cache
+        key: ${{ runner.os }}-buildx-${{ github.sha }}
+        restore-keys: |
+          ${{ runner.os }}-buildx-
+    
+    - name: Create test results directory
+      run: mkdir -p test-results
+    
+    - name: Build test environment
+      run: |
+        docker-compose -f docker/docker-compose.test.yml build \
+          --cache-from type=local,src=/tmp/.buildx-cache \
+          --cache-to type=local,dest=/tmp/.buildx-cache-new,mode=max
+    
+    - name: Start test services
+      run: docker-compose -f docker/docker-compose.test.yml up -d
+    
+    - name: Wait for services
+      run: |
+        echo "Waiting for test services to be ready..."
+        sleep 10
+        docker-compose -f docker/docker-compose.test.yml ps
+    
+    - name: Run ${{ matrix.test-type }} tests
+      run: |
+        docker-compose -f docker/docker-compose.test.yml exec -T asw-test \
+          bash -c "source ~/.test-config && /opt/asw/docker/test/scripts/test-runner.sh ${{ matrix.test-type }}"
+    
+    - name: Copy test results
+      if: always()
+      run: |
+        docker-compose -f docker/docker-compose.test.yml cp asw-test:/opt/test-results/. test-results/ 2>/dev/null || true
+        ls -la test-results/ || echo "No test results found"
+    
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: test-results-${{ matrix.test-type }}-${{ github.sha }}
+        path: test-results/
+        retention-days: 30
+    
+    - name: Generate test summary
+      if: always()
+      run: |
+        if [[ -f "test-results/test-report-"*".md" ]]; then
+          echo "## ASW Framework Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          cat test-results/test-report-*.md >> $GITHUB_STEP_SUMMARY
+        else
+          echo "## Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "❌ Test report not generated" >> $GITHUB_STEP_SUMMARY
+        fi
+    
+    - name: Cleanup
+      if: always()
+      run: |
+        docker-compose -f docker/docker-compose.test.yml down --volumes --remove-orphans
+        
+        # Move cache
+        rm -rf /tmp/.buildx-cache
+        mv /tmp/.buildx-cache-new /tmp/.buildx-cache 2>/dev/null || true
+
+  # Security scan job
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+    
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+  # Lint job
+  lint:
+    name: Lint Scripts
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Install shellcheck
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y shellcheck
+    
+    - name: Run shellcheck on all shell scripts
+      run: |
+        find . -name "*.sh" -not -path "./.trash/*" -not -path "./test-results/*" | \
+        xargs shellcheck -f gcc || true
+    
+    - name: Validate JSON files
+      run: |
+        find . -name "*.json" -not -path "./.trash/*" -not -path "./node_modules/*" | \
+        while read -r file; do
+          echo "Validating $file"
+          jq empty "$file" || exit 1
+        done
+
+  # Performance test job (only on main branch)
+  performance:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    needs: test
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Run performance benchmarks
+      run: |
+        docker-compose -f docker/docker-compose.test.yml build
+        docker-compose -f docker/docker-compose.test.yml up -d
+        
+        echo "Running performance tests..."
+        docker-compose -f docker/docker-compose.test.yml exec -T asw-test \
+          bash -c "time /opt/asw/docker/test/scripts/test-runner.sh all" | tee performance-results.txt
+    
+    - name: Upload performance results
+      uses: actions/upload-artifact@v3
+      with:
+        name: performance-results-${{ github.sha }}
+        path: performance-results.txt
+    
+    - name: Cleanup
+      if: always()
+      run: docker-compose -f docker-compose.test.yml down --volumes --remove-orphans
