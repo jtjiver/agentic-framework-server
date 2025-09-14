@@ -228,7 +228,26 @@ else
 fi
 
 echo ""
-echo -e "${YELLOW}5. 1PASSWORD CLI AND CONFIGURATION${NC}"
+echo -e "${YELLOW}5. GITHUB CLI${NC}"
+echo "============="
+
+# Check GitHub CLI installation
+if command -v gh &>/dev/null; then
+    gh_version=$(gh --version 2>/dev/null | head -1)
+    check_pass "GitHub CLI is installed ($gh_version)"
+    
+    # Check if authenticated
+    if gh auth status &>/dev/null 2>&1; then
+        check_pass "GitHub CLI is authenticated"
+    else
+        check_warn "GitHub CLI is not authenticated (run 'gh auth login')"
+    fi
+else
+    check_fail "GitHub CLI is NOT installed"
+fi
+
+echo ""
+echo -e "${YELLOW}6. 1PASSWORD CLI AND CONFIGURATION${NC}"
 echo "=================================="
 
 if command -v op &>/dev/null; then
@@ -268,7 +287,7 @@ else
 fi
 
 echo ""
-echo -e "${YELLOW}6. SSH CONFIGURATION${NC}"
+echo -e "${YELLOW}7. SSH CONFIGURATION${NC}"
 echo "====================="
 
 # Check SSH service
@@ -311,7 +330,7 @@ else
 fi
 
 echo ""
-echo -e "${YELLOW}7. ASW FRAMEWORK STRUCTURE${NC}"
+echo -e "${YELLOW}8. ASW FRAMEWORK STRUCTURE${NC}"
 echo "=========================="
 
 # Check /opt/asw directory structure
@@ -364,7 +383,7 @@ else
 fi
 
 echo ""
-echo -e "${YELLOW}8. CC-USER SHELL ENVIRONMENT${NC}"
+echo -e "${YELLOW}9. CC-USER SHELL ENVIRONMENT${NC}"
 echo "============================="
 
 # Check .bashrc exists and is configured
@@ -440,7 +459,7 @@ else
 fi
 
 echo ""
-echo -e "${YELLOW}9. SYSTEM INFORMATION${NC}"
+echo -e "${YELLOW}10. SYSTEM INFORMATION${NC}"
 echo "====================="
 
 echo -e "  ${BLUE}OS Information:${NC}"

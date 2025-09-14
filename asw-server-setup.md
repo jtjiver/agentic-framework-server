@@ -12,6 +12,7 @@ The setup is run entirely from your **local driving server** which has all the f
 - SSH access configured with key authentication
 - **Local driving server** with all ASW framework repositories cloned
 - Git installed on local machine
+- GitHub CLI (gh) - Will be automatically installed during setup
 
 ## Setup Process
 
