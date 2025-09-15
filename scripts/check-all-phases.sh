@@ -143,7 +143,7 @@ if [[ $PHASES_FAILED -eq 0 ]]; then
     echo ""
     echo -e "${YELLOW}Next steps:${NC}"
     echo -e "  1. Create your first project:"
-    echo -e "     ${CYAN}/opt/asw/scripts/new-project.sh my-awesome-project personal${NC}"
+    echo -e "     ${CYAN}/opt/asw/agentic-framework-dev/lib/projects/create-project-local.sh my-awesome-project personal${NC}"
     echo -e "  2. Start development server:"
     echo -e "     ${CYAN}asw-dev-server start${NC}"
     echo -e "  3. View all available commands:"

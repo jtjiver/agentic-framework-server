@@ -273,7 +273,24 @@ else
     echo \"✅ 1Password CLI already installed: \$(op --version)\"
 fi"
 
-log "  🛡️ 6.9: Configuring firewall..."
+log "  🐙 6.9: Installing GitHub CLI..."
+ssh -A -o StrictHostKeyChecking=no -p "$SSH_PORT" cc-user@"$SERVER_IP" "
+if ! command -v gh &> /dev/null; then
+    (type -p wget >/dev/null || (sudo apt update && sudo apt install wget -y)) \
+        && sudo mkdir -p -m 755 /etc/apt/keyrings \
+        && out=\$(mktemp) && wget -nv -O\$out https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+        && cat \$out | sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null \
+        && sudo chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg \
+        && sudo mkdir -p -m 755 /etc/apt/sources.list.d \
+        && echo \"deb [arch=\$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main\" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+        && sudo apt update \
+        && sudo apt install gh -y
+    echo \"✅ GitHub CLI installed: \$(gh --version | head -1)\"
+else
+    echo \"✅ GitHub CLI already installed: \$(gh --version | head -1)\"
+fi"
+
+log "  🛡️ 6.10: Configuring firewall..."
 ssh -A -o StrictHostKeyChecking=no -p "$SSH_PORT" cc-user@"$SERVER_IP" "
 sudo ufw default deny incoming
 sudo ufw default allow outgoing  
@@ -283,10 +300,10 @@ sudo ufw allow 443/tcp
 echo 'y' | sudo ufw enable
 echo \"✅ UFW firewall configured\""
 
-log "  🚨 6.10: Configuring fail2ban..."
+log "  🚨 6.11: Configuring fail2ban..."
 ssh -A -o StrictHostKeyChecking=no -p "$SSH_PORT" cc-user@"$SERVER_IP" "sudo systemctl enable fail2ban && sudo systemctl start fail2ban && echo \"✅ fail2ban configured\""
 
-log "  🔒 6.11: Hardening SSH configuration..."
+log "  🔒 6.12: Hardening SSH configuration..."
 ssh -A -o StrictHostKeyChecking=no -p "$SSH_PORT" cc-user@"$SERVER_IP" "
 sudo cp /etc/ssh/sshd_config /etc/ssh/sshd_config.backup.\$(date +%Y%m%d) 2>/dev/null || true
 sudo tee /etc/ssh/sshd_config.d/99-hardening.conf > /dev/null << 'EOF'
@@ -459,7 +476,7 @@ fi
 log "✅ Step 13: Basic system verification..."
 ssh -o PasswordAuthentication=no -o ConnectTimeout=10 -p 2222 \
     cc-user@"$SERVER_IP" \
-    "echo 'Server: $(hostname)' && echo 'User: $(whoami)' && echo 'Node.js: $(node --version)' && echo 'Claude Code: $(claude --version 2>/dev/null || echo \"not found\")' && echo '1Password: $(op --version)' && echo 'Framework: $(ls -la /opt/asw/ | wc -l) directories'" \
+    "echo 'Server: $(hostname)' && echo 'User: $(whoami)' && echo 'Node.js: $(node --version)' && echo 'Claude Code: $(claude --version 2>/dev/null || echo \"not found\")' && echo '1Password: $(op --version)' && echo 'GitHub CLI: $(gh --version 2>/dev/null | head -1 || echo \"not found\")' && echo 'Framework: $(ls -la /opt/asw/ | wc -l) directories'" \
     2>/dev/null || warn "Basic verification had issues"
 
 # Step 14: Comprehensive ASW Framework validation
@@ -562,7 +579,7 @@ cat >> "$MD_REPORT" << EOF
 - ✅ SSH hardened (key-only, no root)
 - ✅ UFW firewall enabled  
 - ✅ fail2ban active
-- ✅ Node.js + Claude Code + 1Password CLI installed
+- ✅ Node.js + Claude Code + 1Password CLI + GitHub CLI installed
 - ✅ ASW framework repositories cloned
 - ✅ Claude Code configuration (.claude) installed
 - ✅ 1Password SSH agent integration
@@ -586,7 +603,7 @@ cat >> "$MD_REPORT" << EOF
 ### Next Steps
 $(if [[ "$VALIDATION_STATUS" == "✅ SUCCESS" ]]; then
     echo "🎉 Server is fully configured and ready for development!"
-    echo "- Create your first project: \`/opt/asw/scripts/new-project.sh my-project personal\`"
+    echo "- Create your first project: \`/opt/asw/agentic-framework-dev/lib/projects/create-project-local.sh my-project personal\`"
     echo "- Start development server: \`asw-dev-server start\`"
 elif [[ "$VALIDATION_STATUS" == "⚠️ PARTIAL" ]]; then
     echo "⚠️ Server setup is partially complete. Review validation results above."
@@ -618,7 +635,7 @@ echo "✅ Features Configured:"
 echo "  - SSH hardened (key-only, no root)"
 echo "  - UFW firewall enabled"
 echo "  - fail2ban active"
-echo "  - Node.js + Claude Code + 1Password CLI installed"
+echo "  - Node.js + Claude Code + 1Password CLI + GitHub CLI installed"
 echo "  - ASW framework repositories cloned"
 echo "  - Claude Code configuration (.claude) installed"
 echo "  - 1Password SSH agent integration"

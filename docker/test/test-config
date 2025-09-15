@@ -1,0 +1,71 @@
+#!/bin/bash
+# Test environment configuration for ASW Framework
+
+# Test environment variables
+export ASW_TEST_MODE=true
+export ASW_TEST_ROOT=/opt/asw
+export TEST_RESULTS_DIR=/opt/test-results
+export TEST_TEMP_DIR=/tmp/asw-tests
+
+# BATS configuration
+export BATS_LIB_PATH="/opt/bats-support:/opt/bats-assert:/opt/bats-file"
+
+# Mock credentials for testing (never use in production)
+export TEST_OP_SERVICE_ACCOUNT_TOKEN="test-token-not-real"
+export TEST_GITHUB_TOKEN="test-github-token"
+
+# Test database configuration
+export TEST_DB_HOST=test-postgres
+export TEST_DB_PORT=5432
+export TEST_DB_NAME=asw_test
+export TEST_DB_USER=asw_test
+export TEST_DB_PASSWORD=test_password
+
+# Test web server
+export TEST_NGINX_HOST=test-nginx
+export TEST_NGINX_PORT=80
+
+# Disable actual SSH operations in tests
+export SSH_DISABLE_STRICT_HOST_KEY_CHECKING=true
+export SSH_TEST_MODE=true
+
+# Color output for test results
+export TERM=xterm-256color
+export FORCE_COLOR=1
+
+# Test utilities
+alias test-runner="bash /opt/asw/docker/test/scripts/test-runner.sh"
+alias run-unit-tests="bash /opt/asw/docker/test/scripts/run-unit-tests.sh"
+alias run-integration-tests="bash /opt/asw/docker/test/scripts/run-integration-tests.sh"
+alias run-security-tests="bash /opt/asw/docker/test/scripts/run-security-tests.sh"
+alias test-all="bash /opt/asw/docker/test/scripts/test-all.sh"
+
+# Utility functions for tests
+test_setup_temp_dir() {
+    mkdir -p "$TEST_TEMP_DIR"
+    cd "$TEST_TEMP_DIR"
+}
+
+test_cleanup_temp_dir() {
+    if [[ "$PWD" == "$TEST_TEMP_DIR"* ]]; then
+        cd /opt/asw
+        rm -rf "$TEST_TEMP_DIR"
+    fi
+}
+
+test_mock_1password() {
+    # Create mock op command for testing
+    mkdir -p /tmp/test-bin
+    cat > /tmp/test-bin/op << 'EOF'
+#!/bin/bash
+echo "Mock 1Password CLI - Test Mode"
+exit 0
+EOF
+    chmod +x /tmp/test-bin/op
+    export PATH="/tmp/test-bin:$PATH"
+}
+
+test_cleanup_mocks() {
+    export PATH=$(echo "$PATH" | sed 's|/tmp/test-bin:||g')
+    rm -rf /tmp/test-bin
+}

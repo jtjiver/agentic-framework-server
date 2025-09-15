@@ -1,0 +1,27 @@
+# Agentic Secure Framework - Security Files
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+.1password-config
+.asw-config.json
+
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Logs  
+*.log
+logs/
+logs/*.log
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db

@@ -467,7 +467,7 @@ if [[ $FAILED_CHECKS -eq 0 ]]; then
     echo -e "${BLUE}🚀 Your ASW Framework development server is ready for use!${NC}"
     echo ""
     echo -e "${BLUE}Next steps:${NC}"
-    echo -e "   • Create a new project: ${YELLOW}/opt/asw/scripts/new-project.sh my-project personal${NC}"
+    echo -e "   • Create a new project: ${YELLOW}/opt/asw/agentic-framework-dev/lib/projects/create-project-local.sh my-project personal${NC}"
     echo -e "   • Start development server: ${YELLOW}asw-dev-server start${NC}"
     echo -e "   • View available commands: ${YELLOW}ls /usr/local/bin/asw-*${NC}"
     exit 0

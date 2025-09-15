@@ -1,0 +1,85 @@
+version: '3.8'
+
+services:
+  # Main test environment - Ubuntu to match VPS
+  asw-test:
+    build:
+      context: ..
+      dockerfile: docker/test/Dockerfile
+      target: test
+    container_name: asw-test-runner
+    volumes:
+      # Mount the entire ASW framework for testing
+      - ..:/opt/asw:ro
+      - ../test-results:/opt/test-results:rw
+      # Mount docker socket for testing docker-related scripts
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - TEST_ENVIRONMENT=docker
+      - ASW_ROOT=/opt/asw
+      - DEBIAN_FRONTEND=noninteractive
+    working_dir: /opt/asw
+    command: ["tail", "-f", "/dev/null"]  # Keep container running
+    networks:
+      - asw-test-network
+
+  # Isolated test environment for security testing
+  asw-test-isolated:
+    build:
+      context: ..
+      dockerfile: docker/test/Dockerfile
+      target: isolated-test
+    container_name: asw-test-isolated
+    volumes:
+      - ..:/opt/asw:ro
+      - ../test-results:/opt/test-results:rw
+    environment:
+      - TEST_ENVIRONMENT=docker-isolated
+      - ASW_ROOT=/opt/asw
+      - DEBIAN_FRONTEND=noninteractive
+    working_dir: /opt/asw
+    command: ["tail", "-f", "/dev/null"]
+    networks:
+      - asw-test-network
+    # Security constraints for isolated testing
+    security_opt:
+      - no-new-privileges:true
+    read_only: false  # Need write access to /tmp for testing
+    tmpfs:
+      - /tmp:exec,nodev,nosuid
+
+  # Test database for integration tests
+  test-postgres:
+    image: postgres:15-alpine
+    container_name: asw-test-db
+    environment:
+      - POSTGRES_DB=asw_test
+      - POSTGRES_USER=asw_test
+      - POSTGRES_PASSWORD=test_password
+      - POSTGRES_HOST_AUTH_METHOD=trust
+    volumes:
+      - test-db-data:/var/lib/postgresql/data
+    networks:
+      - asw-test-network
+    ports:
+      - "5433:5432"  # Different port to avoid conflicts
+
+  # Test nginx for web service testing
+  test-nginx:
+    image: nginx:alpine
+    container_name: asw-test-nginx
+    volumes:
+      - ./test/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ../test-results/nginx:/var/log/nginx:rw
+    networks:
+      - asw-test-network
+    ports:
+      - "8080:80"
+
+networks:
+  asw-test-network:
+    driver: bridge
+
+volumes:
+  test-db-data:
+    driver: local
