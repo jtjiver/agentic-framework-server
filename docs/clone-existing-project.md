@@ -121,27 +121,27 @@ Once started, your application is accessible from:
 - **Subdomain access**: `http://<project-name>.8020perfect.com`
 - **HTTPS access**: `https://<project-name>.8020perfect.com` (with --https flag)
 
-### Subdomain System (8020perfect.com) - Coming Soon
+### Subdomain System (8020perfect.com) - ✅ ACTIVE
 
-⚠️ **Note**: The 8020perfect.com domain is still on the old server and needs to be migrated to this infrastructure.
+✅ **Domain Status**: The 8020perfect.com domain is fully operational on this server.
 
-The ASW infrastructure is designed to automatically create subdomains following this pattern:
+The ASW infrastructure automatically creates subdomains with SSL certificates:
 - `<project-name>.8020perfect.com` → Proxies to `localhost:<allocated-port>`
-- Examples (when domain is migrated):
-  - `tennis-tracker.8020perfect.com` → `localhost:3000`
-  - `n8n.8020perfect.com` → `localhost:3001`
-  - `api-service.8020perfect.com` → `localhost:3002`
+- **Working Examples**:
+  - `https://n8n.8020perfect.com` → `localhost:5678`
+  - `https://monitor.dev.8020perfect.com` → `localhost:3001`
+  - `https://beszel.dev.8020perfect.com` → `localhost:8080`
 
-**Current Status**: Use direct IP access until domain migration is complete.
-- Current access: `http://152.53.136.76:<port>`
-- After migration: `http://<project-name>.8020perfect.com`
+**Access Options**:
+- Direct IP: `http://152.53.136.76:<port>`
+- HTTP Subdomain: `http://<project-name>.8020perfect.com`
+- **HTTPS Subdomain: `https://<project-name>.8020perfect.com`** ⭐
 
-#### SSL Certificate Management (Ready for Domain Migration)
-- **Self-signed certificates** for HTTPS development
-- **Automatic generation** per subdomain  
-- **No external dependencies** (no Let's Encrypt setup needed)
-- **Browser warning expected** (dev certificates are not trusted)
-- **Domain migration required** for full functionality
+#### SSL Certificate Management - ✅ FULLY AUTOMATED
+- **Let's Encrypt certificates** automatically provisioned
+- **No browser warnings** - trusted certificates
+- **Automatic renewal** via certbot
+- **Zero configuration required** - handled by ASW dev server
 
 ## Management Commands
 
