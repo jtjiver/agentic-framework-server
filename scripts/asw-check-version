@@ -224,11 +224,14 @@ class ASWVersionChecker:
         """Get VPS Git commit, branch, and date via SSH"""
         if not self.check_vps:
             return None, None, None
-            
+
         try:
-            # Convert local path to VPS path
-            vps_path = repo_path.replace("/opt/asw", "/opt/asw")
-            
+            # VPS path is the same as local path - both use /opt/asw
+            vps_path = repo_path
+
+            if self.verbose:
+                print(f"[DEBUG] Checking VPS path: {vps_path}")
+
             # Check if directory exists and get git info
             commands = [
                 f"cd {vps_path} && git rev-parse HEAD 2>/dev/null | head -c 8",
@@ -239,20 +242,37 @@ class ASWVersionChecker:
             results = []
             for cmd in commands:
                 ssh_cmd = f"{self.ssh_config} '{cmd}'"
-                result = subprocess.run(
-                    ssh_cmd,
-                    shell=True,
-                    capture_output=True,
-                    text=True,
-                    timeout=10
-                )
-                if result.returncode == 0:
-                    results.append(result.stdout.strip())
-                else:
+                try:
+                    result = subprocess.run(
+                        ssh_cmd,
+                        shell=True,
+                        capture_output=True,
+                        text=True,
+                        timeout=10
+                    )
+                    if result.returncode == 0:
+                        output = result.stdout.strip()
+                        if self.verbose:
+                            print(f"[DEBUG] Command succeeded for {vps_path}: '{cmd}' -> '{output}'")
+                        # For branch command, empty string means detached HEAD - convert to "detached"
+                        if "git branch --show-current" in cmd and output == "":
+                            output = "detached"
+                        results.append(output if output else None)
+                    else:
+                        if self.verbose:
+                            print(f"[DEBUG] Command failed for {vps_path}: {cmd}")
+                            print(f"[DEBUG] Return code: {result.returncode}")
+                            print(f"[DEBUG] Stderr: {result.stderr}")
+                        results.append(None)
+                except subprocess.TimeoutExpired:
+                    if self.verbose:
+                        print(f"[DEBUG] Timeout for {vps_path}: {cmd}")
                     results.append(None)
-            
+
             return results[0], results[1], results[2]
-        except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+            if self.verbose:
+                print(f"[DEBUG] Exception for {vps_path}: {e}")
             return None, None, None
 
     def get_github_version(self, github_url: str) -> Tuple[Optional[str], Optional[str], Optional[str]]:
@@ -343,6 +363,9 @@ class ASWVersionChecker:
             local_commit, local_branch, local_date = self.get_local_version(repo.path)
             vps_commit, vps_branch, vps_date = self.get_vps_version(repo.path)
             github_commit, github_branch, github_date = self.get_github_version(repo.github_url)
+
+            if self.verbose:
+                print(f"[DEBUG] {repo.name}: VPS results = commit:{vps_commit}, branch:{vps_branch}, date:{vps_date}")
             
             version_info = VersionInfo(
                 repo_name=repo.name,
