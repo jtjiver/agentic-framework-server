@@ -259,14 +259,24 @@ class SSHTTSManager:
         webhook_url = f"{ngrok_url}/tts"
         
         ssh_commands = f"""
+        # Create /opt/asw/.env if it doesn't exist
+        touch /opt/asw/.env
+        
         # Remove existing webhook URL
         sed -i '/^TTS_WEBHOOK_URL=/d' /opt/asw/.env 2>/dev/null || true
         
         # Add new webhook URL
         echo "TTS_WEBHOOK_URL={webhook_url}" >> /opt/asw/.env
         
+        # Make sure the file is readable
+        chmod 644 /opt/asw/.env
+        
         # Export for current session
         export TTS_WEBHOOK_URL="{webhook_url}"
+        
+        # Verify it was written
+        echo "📝 Verifying .env file:"
+        grep "TTS_WEBHOOK_URL" /opt/asw/.env || echo "❌ Failed to write to .env"
         
         echo "✅ Server configured with webhook: {webhook_url}"
         

@@ -57,14 +57,45 @@ class SSHTTSDiagnostics:
         if not success:
             self.results["errors"].append(f"{test_name}: {details}")
 
+    def get_tts_port(self):
+        """Get TTS port from manager's log or default"""
+        try:
+            # Check if there's a running TTS server log with port info
+            log_file = self.log_dir / "tts_server.log"
+            if log_file.exists():
+                content = log_file.read_text()
+                # Look for port in log file
+                import re
+                port_match = re.search(r'port[:\s=]+(\d+)', content)
+                if port_match:
+                    return int(port_match.group(1))
+            
+            # Check processes for laptop_tts_server.py
+            import subprocess
+            result = subprocess.run(['lsof', '-i', '-P', '-n'], capture_output=True, text=True)
+            for line in result.stdout.split('\n'):
+                if 'laptop_tts_server.py' in line and 'LISTEN' in line:
+                    port_match = re.search(r':(\d+)', line)
+                    if port_match:
+                        return int(port_match.group(1))
+        except:
+            pass
+        
+        # Default fallback
+        return 1414
+
     def test_laptop_tts_server(self):
         """Test local TTS server functionality"""
         print("\n🔍 Testing Laptop TTS Server")
         print("=" * 40)
         
+        # Get dynamic port
+        tts_port = self.get_tts_port()
+        print(f"   Checking port: {tts_port}")
+        
         # Test health endpoint
         try:
-            response = requests.get("http://localhost:1414/health", timeout=5)
+            response = requests.get(f"http://localhost:{tts_port}/health", timeout=5)
             if response.status_code == 200:
                 self.log_test("TTS Server Health", True, "Server responding")
                 self.results["laptop_tts_server"] = True
@@ -79,7 +110,7 @@ class SSHTTSDiagnostics:
         try:
             test_payload = {"text": "Laptop TTS diagnostics test"}
             response = requests.post(
-                "http://localhost:1414/tts",
+                f"http://localhost:{tts_port}/tts",
                 json=test_payload,
                 timeout=10
             )
@@ -205,9 +236,9 @@ class SSHTTSDiagnostics:
                 timeout=10
             )
             
-            # Check environment variables
+            # Check environment variables (source .env file first)
             stdin, stdout, stderr = ssh.exec_command(
-                'echo "TTS_WEBHOOK_URL: $TTS_WEBHOOK_URL"; echo "SSH_CLIENT: $SSH_CLIENT"'
+                'cd /opt/asw && source .env 2>/dev/null; echo "TTS_WEBHOOK_URL: $TTS_WEBHOOK_URL"; echo "SSH_CLIENT: $SSH_CLIENT"'
             )
             output = stdout.read().decode().strip()
             
@@ -253,8 +284,8 @@ class SSHTTSDiagnostics:
                 timeout=10
             )
             
-            # Test webhook TTS script
-            command = 'export PATH="$HOME/.local/bin:$PATH"; uv run /opt/asw/.claude/hooks/utils/tts/webhook_tts.py "End-to-end diagnostics test"'
+            # Test webhook TTS script (source .env first)
+            command = 'cd /opt/asw && source .env 2>/dev/null; export PATH="$HOME/.local/bin:$PATH"; uv run /opt/asw/.claude/hooks/utils/tts/webhook_tts.py "End-to-end diagnostics test"'
             stdin, stdout, stderr = ssh.exec_command(command)
             
             # Wait for command completion
