@@ -102,7 +102,7 @@ install_essentials() {
     fi
     
     log_info "Installing essential packages..."
-    remote_exec "apt install -y sudo curl git wget htop vim nano build-essential"
+    remote_exec "apt install -y sudo curl git wget htop vim nano build-essential bc net-tools python3 python3-pip python3-venv"
     mark_completed "essentials"
 }
 
@@ -293,6 +293,28 @@ clone_framework() {
     mark_completed "asw_framework"
 }
 
+# Step 7b: Setup System Monitoring
+setup_monitoring() {
+    if is_completed "monitoring_setup"; then
+        log_info "Monitoring already setup, skipping..."
+        return 0
+    fi
+    
+    log_info "Installing system monitoring and Gmail API dependencies..."
+    
+    # Install Gmail API dependencies
+    remote_exec "pip3 install google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client"
+    
+    # Setup monitoring if framework is available
+    remote_exec_cc "
+        if [[ -f /opt/asw/agentic-framework-infrastructure/lib/monitoring/install-monitoring.sh ]]; then
+            sudo /opt/asw/agentic-framework-infrastructure/lib/monitoring/install-monitoring.sh
+        fi
+    "
+    
+    mark_completed "monitoring_setup"
+}
+
 # Step 8: Additional Security
 additional_security() {
     if is_completed "additional_security"; then
@@ -374,6 +396,7 @@ main() {
     install_1password
     harden_ssh
     clone_framework
+    setup_monitoring
     additional_security
     
     # Validate
