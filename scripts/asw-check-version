@@ -1,0 +1,487 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.8"
+# dependencies = [
+#     "requests",
+#     "tabulate",
+#     "colorama",
+# ]
+# ///
+
+"""
+ASW Framework Version Checker
+
+Compares versions across:
+- Local installation (where script is run)
+- VPS server (via SSH)
+- GitHub repositories (latest commits)
+
+Usage: asw-check-version [--verbose] [--no-vps] [--no-projects]
+"""
+
+import subprocess
+import json
+import sys
+import os
+from pathlib import Path
+from dataclasses import dataclass, asdict
+from typing import Dict, List, Optional, Tuple
+import argparse
+from datetime import datetime
+
+try:
+    import requests
+    from tabulate import tabulate
+    from colorama import init, Fore, Style
+    init()  # Initialize colorama for cross-platform colored output
+except ImportError as e:
+    print(f"Missing dependency: {e}")
+    print("This script uses uv to auto-install dependencies. Make sure uv is installed.")
+    sys.exit(1)
+
+@dataclass
+class RepoInfo:
+    name: str
+    path: str
+    github_url: str
+    repo_type: str  # 'main', 'submodule', 'project'
+
+@dataclass
+class VersionInfo:
+    repo_name: str
+    repo_type: str
+    local_commit: Optional[str] = None
+    local_branch: Optional[str] = None
+    local_date: Optional[str] = None
+    vps_commit: Optional[str] = None
+    vps_branch: Optional[str] = None
+    vps_date: Optional[str] = None
+    github_commit: Optional[str] = None
+    github_branch: Optional[str] = None
+    github_date: Optional[str] = None
+    status: str = "unknown"
+
+class ASWVersionChecker:
+    def __init__(self, verbose: bool = False, check_vps: bool = True, check_projects: bool = True):
+        self.verbose = verbose
+        self.check_vps = check_vps
+        self.check_projects = check_projects
+        self.asw_root = Path("/opt/asw")
+        self.ssh_config = "ssh -A -p 2222 cc-user@152.53.136.76"
+        self.repos: List[RepoInfo] = []
+        
+    def log(self, message: str, level: str = "INFO"):
+        if self.verbose or level == "ERROR":
+            timestamp = datetime.now().strftime("%H:%M:%S")
+            color = Fore.RED if level == "ERROR" else Fore.BLUE if level == "INFO" else Fore.YELLOW
+            print(f"{color}[{timestamp}] {level}: {message}{Style.RESET_ALL}")
+
+    def discover_repositories(self) -> List[RepoInfo]:
+        """Discover all ASW repositories (main, submodules, projects)"""
+        repos = []
+        
+        # Main repository
+        if (self.asw_root / ".git").exists():
+            main_remote = self.get_git_remote(self.asw_root)
+            if main_remote:
+                repos.append(RepoInfo(
+                    name="agentic-framework-server",
+                    path=str(self.asw_root),
+                    github_url=main_remote,
+                    repo_type="main"
+                ))
+        
+        # Submodules
+        gitmodules_path = self.asw_root / ".gitmodules"
+        if gitmodules_path.exists():
+            submodules = self.parse_gitmodules(gitmodules_path)
+            for submodule in submodules:
+                submodule_path = self.asw_root / submodule["path"]
+                if submodule_path.exists():
+                    repos.append(RepoInfo(
+                        name=submodule["name"],
+                        path=str(submodule_path),
+                        github_url=submodule["url"],
+                        repo_type="submodule"
+                    ))
+        
+        # Project repositories
+        if self.check_projects:
+            projects_dir = self.asw_root / "projects"
+            if projects_dir.exists():
+                for project_repo in self.find_project_repos(projects_dir):
+                    repos.append(project_repo)
+        
+        self.repos = repos
+        self.log(f"Discovered {len(repos)} repositories")
+        return repos
+
+    def parse_gitmodules(self, gitmodules_path: Path) -> List[Dict[str, str]]:
+        """Parse .gitmodules file to extract submodule information"""
+        submodules = []
+        current_submodule = {}
+        
+        with open(gitmodules_path, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith('[submodule "') and line.endswith('"]'):
+                    if current_submodule:
+                        submodules.append(current_submodule)
+                    name = line.split('"')[1]
+                    current_submodule = {"name": name}
+                elif line.startswith("path = "):
+                    current_submodule["path"] = line.split(" = ")[1]
+                elif line.startswith("url = "):
+                    current_submodule["url"] = line.split(" = ")[1]
+        
+        if current_submodule:
+            submodules.append(current_submodule)
+        
+        return submodules
+
+    def find_project_repos(self, projects_dir: Path) -> List[RepoInfo]:
+        """Find all Git repositories in the projects directory"""
+        project_repos = []
+        
+        for git_dir in projects_dir.rglob(".git"):
+            if git_dir.is_dir():
+                repo_path = git_dir.parent
+                remote_url = self.get_git_remote(repo_path)
+                if remote_url:
+                    project_name = repo_path.name
+                    relative_path = repo_path.relative_to(self.asw_root)
+                    project_repos.append(RepoInfo(
+                        name=f"project:{project_name}",
+                        path=str(repo_path),
+                        github_url=remote_url,
+                        repo_type="project"
+                    ))
+        
+        return project_repos
+
+    def get_git_remote(self, repo_path: Path) -> Optional[str]:
+        """Get the remote URL for a Git repository"""
+        try:
+            result = subprocess.run(
+                ["git", "remote", "get-url", "origin"],
+                cwd=repo_path,
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            url = result.stdout.strip()
+            # Clean up URL (remove credentials, convert SSH to HTTPS for API access)
+            if "@github.com:" in url:
+                # SSH format: git@github.com:user/repo.git
+                url = url.replace("git@github.com:", "https://github.com/")
+            elif "github.com" in url and "@" in url:
+                # HTTPS with credentials: https://token@github.com/user/repo.git
+                url = "https://github.com/" + url.split("github.com/")[1]
+            return url
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            return None
+
+    def get_local_version(self, repo_path: str) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+        """Get local Git commit, branch, and date"""
+        try:
+            path = Path(repo_path)
+            
+            # Get current commit
+            commit_result = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=path,
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            commit = commit_result.stdout.strip()[:8]
+            
+            # Get current branch
+            branch_result = subprocess.run(
+                ["git", "branch", "--show-current"],
+                cwd=path,
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            branch = branch_result.stdout.strip() or "detached"
+            
+            # Get commit date
+            date_result = subprocess.run(
+                ["git", "log", "-1", "--format=%ci"],
+                cwd=path,
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            date = date_result.stdout.strip()
+            
+            return commit, branch, date
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            return None, None, None
+
+    def get_vps_version(self, repo_path: str) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+        """Get VPS Git commit, branch, and date via SSH"""
+        if not self.check_vps:
+            return None, None, None
+            
+        try:
+            # Convert local path to VPS path
+            vps_path = repo_path.replace("/opt/asw", "/opt/asw")
+            
+            # Check if directory exists and get git info
+            commands = [
+                f"cd {vps_path} && git rev-parse HEAD 2>/dev/null | head -c 8",
+                f"cd {vps_path} && git branch --show-current 2>/dev/null || echo detached",
+                f"cd {vps_path} && git log -1 --format=%ci 2>/dev/null"
+            ]
+            
+            results = []
+            for cmd in commands:
+                ssh_cmd = f"{self.ssh_config} '{cmd}'"
+                result = subprocess.run(
+                    ssh_cmd,
+                    shell=True,
+                    capture_output=True,
+                    text=True,
+                    timeout=10
+                )
+                if result.returncode == 0:
+                    results.append(result.stdout.strip())
+                else:
+                    results.append(None)
+            
+            return results[0], results[1], results[2]
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+            return None, None, None
+
+    def get_github_version(self, github_url: str) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+        """Get latest GitHub commit info via API"""
+        try:
+            # Extract owner and repo from URL
+            if "github.com/" not in github_url:
+                return None, None, None
+            
+            parts = github_url.replace(".git", "").split("github.com/")[1].split("/")
+            if len(parts) < 2:
+                return None, None, None
+            
+            owner, repo = parts[0], parts[1]
+            
+            # Get default branch
+            repo_api_url = f"https://api.github.com/repos/{owner}/{repo}"
+            repo_response = requests.get(repo_api_url, timeout=10)
+            
+            if repo_response.status_code != 200:
+                return None, None, None
+            
+            repo_data = repo_response.json()
+            default_branch = repo_data.get("default_branch", "main")
+            
+            # Get latest commit on default branch
+            commits_api_url = f"https://api.github.com/repos/{owner}/{repo}/commits/{default_branch}"
+            commits_response = requests.get(commits_api_url, timeout=10)
+            
+            if commits_response.status_code != 200:
+                return None, None, None
+            
+            commit_data = commits_response.json()
+            commit_sha = commit_data["sha"][:8]
+            commit_date = commit_data["commit"]["committer"]["date"]
+            
+            return commit_sha, default_branch, commit_date
+        except (requests.RequestException, KeyError, ValueError):
+            return None, None, None
+
+    def determine_status(self, version_info: VersionInfo) -> str:
+        """Determine the status of a repository based on version comparison"""
+        local_commit = version_info.local_commit
+        vps_commit = version_info.vps_commit
+        github_commit = version_info.github_commit
+        
+        if not local_commit:
+            return "no_local"
+        
+        statuses = []
+        
+        # Compare with VPS
+        if self.check_vps:
+            if not vps_commit:
+                statuses.append("no_vps")
+            elif local_commit == vps_commit:
+                statuses.append("vps_synced")
+            else:
+                statuses.append("vps_differ")
+        
+        # Compare with GitHub
+        if not github_commit:
+            statuses.append("no_github")
+        elif local_commit == github_commit:
+            statuses.append("github_synced")
+        else:
+            statuses.append("github_differ")
+        
+        # Determine overall status
+        if "github_synced" in statuses and "vps_synced" in statuses:
+            return "all_synced"
+        elif "github_synced" in statuses:
+            return "github_synced"
+        elif "vps_synced" in statuses:
+            return "vps_synced"
+        elif "github_differ" in statuses or "vps_differ" in statuses:
+            return "outdated"
+        else:
+            return "unknown"
+
+    def check_all_versions(self) -> List[VersionInfo]:
+        """Check versions for all discovered repositories"""
+        version_infos = []
+        
+        for i, repo in enumerate(self.repos):
+            self.log(f"Checking {repo.name} ({i+1}/{len(self.repos)})")
+            
+            local_commit, local_branch, local_date = self.get_local_version(repo.path)
+            vps_commit, vps_branch, vps_date = self.get_vps_version(repo.path)
+            github_commit, github_branch, github_date = self.get_github_version(repo.github_url)
+            
+            version_info = VersionInfo(
+                repo_name=repo.name,
+                repo_type=repo.repo_type,
+                local_commit=local_commit,
+                local_branch=local_branch,
+                local_date=local_date,
+                vps_commit=vps_commit,
+                vps_branch=vps_branch,
+                vps_date=vps_date,
+                github_commit=github_commit,
+                github_branch=github_branch,
+                github_date=github_date
+            )
+            
+            version_info.status = self.determine_status(version_info)
+            version_infos.append(version_info)
+        
+        return version_infos
+
+    def format_output(self, version_infos: List[VersionInfo]) -> str:
+        """Format the output as a nice table"""
+        headers = ["Repository", "Type", "Local", "VPS", "GitHub", "Status"]
+        
+        if not self.check_vps:
+            headers.remove("VPS")
+        
+        rows = []
+        for info in version_infos:
+            status_color = self.get_status_color(info.status)
+            
+            local_info = f"{info.local_commit or 'N/A'}"
+            if info.local_branch and info.local_branch != "detached":
+                local_info += f" ({info.local_branch})"
+            
+            vps_info = f"{info.vps_commit or 'N/A'}"
+            if self.check_vps and info.vps_branch and info.vps_branch != "detached":
+                vps_info += f" ({info.vps_branch})"
+            
+            github_info = f"{info.github_commit or 'N/A'}"
+            if info.github_branch:
+                github_info += f" ({info.github_branch})"
+            
+            row = [
+                info.repo_name,
+                info.repo_type,
+                local_info,
+                github_info,
+                f"{status_color}{info.status}{Style.RESET_ALL}"
+            ]
+            
+            if self.check_vps:
+                row.insert(-1, vps_info)  # Insert VPS info before status
+            
+            rows.append(row)
+        
+        return tabulate(rows, headers=headers, tablefmt="grid")
+
+    def get_status_color(self, status: str) -> str:
+        """Get color for status"""
+        color_map = {
+            "all_synced": Fore.GREEN,
+            "github_synced": Fore.YELLOW,
+            "vps_synced": Fore.CYAN,
+            "outdated": Fore.RED,
+            "no_local": Fore.MAGENTA,
+            "no_vps": Fore.MAGENTA,
+            "no_github": Fore.MAGENTA,
+            "unknown": Fore.WHITE
+        }
+        return color_map.get(status, Fore.WHITE)
+
+    def generate_summary(self, version_infos: List[VersionInfo]) -> str:
+        """Generate a summary of the version check"""
+        total = len(version_infos)
+        status_counts = {}
+        
+        for info in version_infos:
+            status_counts[info.status] = status_counts.get(info.status, 0) + 1
+        
+        summary_lines = [
+            f"\n{Fore.CYAN}=== VERSION CHECK SUMMARY ==={Style.RESET_ALL}",
+            f"Total repositories: {total}",
+            ""
+        ]
+        
+        for status, count in status_counts.items():
+            color = self.get_status_color(status)
+            summary_lines.append(f"{color}{status}: {count}{Style.RESET_ALL}")
+        
+        return "\n".join(summary_lines)
+
+def main():
+    parser = argparse.ArgumentParser(description="Check ASW Framework versions across local, VPS, and GitHub")
+    parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
+    parser.add_argument("--no-vps", action="store_true", help="Skip VPS version checking")
+    parser.add_argument("--no-projects", action="store_true", help="Skip project repositories")
+    parser.add_argument("--json", action="store_true", help="Output results as JSON")
+    
+    args = parser.parse_args()
+    
+    checker = ASWVersionChecker(
+        verbose=args.verbose,
+        check_vps=not args.no_vps,
+        check_projects=not args.no_projects
+    )
+    
+    try:
+        print(f"{Fore.CYAN}ASW Framework Version Checker{Style.RESET_ALL}")
+        print(f"Checking versions at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        print()
+        
+        repos = checker.discover_repositories()
+        if not repos:
+            print(f"{Fore.RED}No repositories found in /opt/asw{Style.RESET_ALL}")
+            return 1
+        
+        version_infos = checker.check_all_versions()
+        
+        if args.json:
+            # Output as JSON
+            json_data = [asdict(info) for info in version_infos]
+            print(json.dumps(json_data, indent=2))
+        else:
+            # Output as formatted table
+            print(checker.format_output(version_infos))
+            print(checker.generate_summary(version_infos))
+        
+        return 0
+        
+    except KeyboardInterrupt:
+        print(f"\n{Fore.YELLOW}Interrupted by user{Style.RESET_ALL}")
+        return 1
+    except Exception as e:
+        print(f"{Fore.RED}Error: {e}{Style.RESET_ALL}")
+        if args.verbose:
+            import traceback
+            traceback.print_exc()
+        return 1
+
+if __name__ == "__main__":
+    sys.exit(main())

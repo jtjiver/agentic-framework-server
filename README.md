@@ -57,6 +57,37 @@ This is the complete guide for the ASW Framework at `/opt/asw/`. All documentati
 
 ---
 
+## ⚡ **Quick Start (Fresh Installation)**
+
+```bash
+# 1. Clone the main repository
+git clone <repository-url> /opt/asw
+cd /opt/asw
+
+# 2. Run setup (handles everything automatically)
+./setup.sh
+
+# 3. Verify installation  
+asw-check-version
+```
+
+**What `./setup.sh` does:**
+- ✅ Initializes and updates all Git submodules
+- ✅ Configures proper branch tracking (prevents detached HEAD)
+- ✅ Installs NPM packages globally
+- ✅ Creates project directory structure
+- ✅ Installs ASW version checker command
+- ✅ Sets up Claude Code configuration (hooks, settings, prompts)
+- ✅ Sets up secrets directory
+
+**After setup, you can:**
+- Check versions: `asw-check-version`
+- Use Claude Code with configured hooks and settings
+- Create projects: `./scripts/new-project.sh my-app personal`
+- Deploy services: Use infrastructure utilities
+
+---
+
 ## 🎯 **What This Repo Contains**
 
 This is the **server configuration repo** - it contains only:
