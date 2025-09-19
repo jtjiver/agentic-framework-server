@@ -24,26 +24,20 @@ except ImportError:
 
 def get_tts_script_path():
     """
-    Determine which TTS script to use based on available API keys and SSH context.
-    Priority order: Webhook (for SSH) > ElevenLabs > OpenAI > pyttsx3
+    Determine which TTS script to use based on available API keys.
+    Priority order: ElevenLabs > OpenAI > pyttsx3
     """
     # Get current script directory and construct utils/tts path
     script_dir = Path(__file__).parent
     tts_dir = script_dir / "utils" / "tts"
     
-    # Check if we're in SSH session and webhook is configured (highest priority)
-    if os.getenv('SSH_CLIENT') and os.getenv('TTS_WEBHOOK_URL'):
-        webhook_script = tts_dir / "webhook_tts.py"
-        if webhook_script.exists():
-            return str(webhook_script)
-    
-    # Check for ElevenLabs API key (second priority)
+    # Check for ElevenLabs API key (highest priority)
     if os.getenv('ELEVENLABS_API_KEY'):
         elevenlabs_script = tts_dir / "elevenlabs_tts.py"
         if elevenlabs_script.exists():
             return str(elevenlabs_script)
     
-    # Check for OpenAI API key (third priority)
+    # Check for OpenAI API key (second priority)
     if os.getenv('OPENAI_API_KEY'):
         openai_script = tts_dir / "openai_tts.py"
         if openai_script.exists():
