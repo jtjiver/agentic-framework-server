@@ -58,9 +58,21 @@ class SSHTTSDiagnostics:
             self.results["errors"].append(f"{test_name}: {details}")
 
     def get_tts_port(self):
-        """Get TTS port from manager's log or default"""
+        """Get TTS port from ASW port manager"""
         try:
-            # Check if there's a running TTS server log with port info
+            # First try ASW port manager
+            result = subprocess.run([
+                "/opt/asw/agentic-framework-infrastructure/bin/asw-port-manager",
+                "infra-list"
+            ], capture_output=True, text=True, check=True)
+            for line in result.stdout.split('\n'):
+                if 'tts-laptop-server' in line:
+                    return int(line.split()[0])
+        except (subprocess.CalledProcessError, ValueError):
+            pass
+
+        try:
+            # Fallback: Check if there's a running TTS server log with port info
             log_file = self.log_dir / "tts_server.log"
             if log_file.exists():
                 content = log_file.read_text()
@@ -69,9 +81,8 @@ class SSHTTSDiagnostics:
                 port_match = re.search(r'port[:\s=]+(\d+)', content)
                 if port_match:
                     return int(port_match.group(1))
-            
+
             # Check processes for laptop_tts_server.py
-            import subprocess
             result = subprocess.run(['lsof', '-i', '-P', '-n'], capture_output=True, text=True)
             for line in result.stdout.split('\n'):
                 if 'laptop_tts_server.py' in line and 'LISTEN' in line:
@@ -80,7 +91,7 @@ class SSHTTSDiagnostics:
                         return int(port_match.group(1))
         except:
             pass
-        
+
         # Default fallback
         return 1414
 

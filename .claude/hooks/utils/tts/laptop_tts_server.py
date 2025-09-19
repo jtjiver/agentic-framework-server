@@ -33,6 +33,21 @@ load_dotenv()
 
 app = Flask(__name__)
 
+def get_asw_port():
+    """Get TTS port from ASW port manager"""
+    try:
+        result = subprocess.run([
+            "/opt/asw/agentic-framework-infrastructure/bin/asw-port-manager",
+            "infra-list"
+        ], capture_output=True, text=True, check=True)
+        for line in result.stdout.split('\n'):
+            if 'tts-laptop-server' in line:
+                return int(line.split()[0])
+    except (subprocess.CalledProcessError, ValueError):
+        pass
+    # Fallback to default port
+    return 1414
+
 # Optional authentication token
 AUTH_TOKEN = os.getenv('TTS_WEBHOOK_TOKEN')
 
@@ -121,18 +136,22 @@ def health_check():
     return jsonify({"status": "healthy", "service": "TTS Webhook Server"})
 
 if __name__ == '__main__':
+    # Get port from ASW port manager
+    port = get_asw_port()
+
     print("🎙️  TTS Webhook Server Starting...")
     print("=" * 40)
-    print(f"Server will run on: http://0.0.0.0:5555")
-    print(f"TTS endpoint: http://your-laptop-ip:5555/tts")
-    print(f"Health check: http://your-laptop-ip:5555/health")
-    
+    print(f"Server will run on: http://0.0.0.0:{port}")
+    print(f"TTS endpoint: http://your-laptop-ip:{port}/tts")
+    print(f"Health check: http://your-laptop-ip:{port}/health")
+    print(f"Port managed by: ASW Infrastructure (tts-laptop-server)")
+
     if AUTH_TOKEN:
         print(f"Authentication: Enabled (token required)")
     else:
         print(f"Authentication: Disabled")
-    
+
     print("=" * 40)
-    
+
     # Run the server
-    app.run(host='0.0.0.0', port=5555, debug=False)
+    app.run(host='0.0.0.0', port=port, debug=False)

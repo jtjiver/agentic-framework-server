@@ -48,8 +48,31 @@ class SSHTTSManager:
         self.ssh_host = "cc-user@152.53.136.76"
         self.ssh_port = "2222"
         
-        # Find available port
-        self.tts_port = self.find_available_port()
+        # Get port from ASW port manager
+        self.tts_port = self.get_asw_port()
+
+    def get_asw_port(self):
+        """Get TTS port from ASW port manager"""
+        try:
+            result = subprocess.run([
+                "/opt/asw/agentic-framework-infrastructure/bin/asw-port-manager",
+                "get", "tts-laptop-server"
+            ], capture_output=True, text=True, check=True)
+            return int(result.stdout.strip())
+        except (subprocess.CalledProcessError, ValueError):
+            # Fallback to infrastructure registry check
+            try:
+                result = subprocess.run([
+                    "/opt/asw/agentic-framework-infrastructure/bin/asw-port-manager",
+                    "infra-list"
+                ], capture_output=True, text=True, check=True)
+                for line in result.stdout.split('\n'):
+                    if 'tts-laptop-server' in line:
+                        return int(line.split()[0])
+            except (subprocess.CalledProcessError, ValueError):
+                pass
+            # Final fallback
+            return 1414
 
     def find_available_port(self):
         """Find an available port, avoiding common conflicts"""
